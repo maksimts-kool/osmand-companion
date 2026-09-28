@@ -3,15 +3,15 @@ plugins {
 }
 
 android {
-    namespace = "dev.maksim.osmandsample"
+    namespace = "dev.maksim.routelogger"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.maksim.osmandsample"
+        applicationId = "dev.maksim.routelogger"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
     }
 
     buildTypes {
@@ -36,4 +36,6 @@ dependencies {
 
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.material:material:1.14.0")
+    // Retries Telegram delivery until the network is back.
+    implementation("androidx.work:work-runtime:2.12.0")
 }

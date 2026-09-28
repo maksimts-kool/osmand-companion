@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "osmand-sample-plugin"
+rootProject.name = "osmand-route-logger"
 include(":app")
