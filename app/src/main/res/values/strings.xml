@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">OsmAnd Sample Plugin</string>
+    <string name="status_connected">Connected to %1$s</string>
+    <string name="status_no_access">Connected to %1$s, but access is off.\nIn OsmAnd open Menu → Plugins and tap “OsmAnd Sample Plugin” to enable it.</string>
+    <string name="status_disconnected">Not connected to OsmAnd</string>
+    <string name="osmand_missing">OsmAnd is not installed. Install OsmAnd or OsmAnd+ first.</string>
+    <string name="connect">Connect</string>
+    <string name="enable_plugin">Add layer, buttons, widget &amp; menu item</string>
+    <string name="enable_plugin_hint">Tap a blue point in OsmAnd to see the custom buttons. The widget is under Configure screen → Widgets.</string>
+    <string name="show_tallinn">Move map to Tallinn</string>
+    <string name="add_marker">Add Old Town map marker</string>
+    <string name="show_point">Open Kadriorg point in OsmAnd</string>
+    <string name="bump_widget">Update widget value</string>
+    <string name="route">Route Old Town → TV Tower</string>
+    <string name="stop_navigation">Stop navigation</string>
+    <string name="nav_updates">Log navigation turn updates</string>
+    <string name="open_osmand">Open OsmAnd</string>
+    <string name="log">Log</string>
+    <string name="clear">Clear</string>
+</resources>
