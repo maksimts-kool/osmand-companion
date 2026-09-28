@@ -1,11 +1,15 @@
 package dev.maksim.companion
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import dev.maksim.companion.core.CompanionService
@@ -66,10 +70,29 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
     }
 
     override fun onConnectionChanged(connected: Boolean) {
-        binding.statusText.text = when {
-            !connected -> getString(R.string.status_disconnected)
-            !app.osmand.hasAccess -> getString(R.string.status_no_access, app.osmand.osmandPackage)
-            else -> getString(R.string.status_connected, app.osmand.osmandPackage)
+        val osmand = app.osmand
+        val name = osmandName(osmand.osmandPackage)
+        val (text, hint, color) = when {
+            !connected -> Triple(getString(R.string.status_disconnected), R.string.status_disconnected_hint, R.color.status_error)
+            !osmand.hasAccess -> Triple(getString(R.string.status_no_access, name), R.string.status_no_access_hint, R.color.status_warning)
+            else -> Triple(getString(R.string.status_connected, name), null, R.color.status_ok)
+        }
+        with(binding) {
+            statusText.text = text
+            statusDot.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, color))
+            statusHint.isVisible = hint != null
+            hint?.let { statusHint.setText(it) }
+            connectButton.isVisible = hint != null
+            connectButton.setText(if (connected) R.string.connect_check else R.string.connect)
+        }
+    }
+
+    /** "OsmAnd+" rather than "net.osmand.plus". */
+    private fun osmandName(pkg: String?): String? = pkg?.let {
+        try {
+            packageManager.getApplicationInfo(it, 0).loadLabel(packageManager).toString()
+        } catch (_: PackageManager.NameNotFoundException) {
+            it
         }
     }
 

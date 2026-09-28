@@ -2,7 +2,7 @@
     <string name="tt_feature_title">Transit timetables</string>
     <string name="tt_intro">Timetables for every bus, tram, train and ferry stop in Estonia, from peatus.ee, right on OsmAnd\'s map.</string>
     <string name="tt_show_in_osmand_switch">Show timetables in OsmAnd</string>
-    <string name="tt_where_hint">• Map: stops appear around the map center when it\'s in Estonia (dots from zoom 13, icons from 15). Tap one for its next departures. Configure map → the app\'s name hides them.\n• In a stop\'s menu: Next departures reloads them, Full day lists the rest of today by route.\n• Configure screen → widgets: Next departure, for the stop you last opened. Tap it for the full timetable.\n• Main menu: Transit timetables opens the search below.</string>
+    <string name="tt_where_hint">• Map: stops appear around the map center when it\'s in Estonia (dots from zoom 13, icons from 15). Tap one for its next departures. Configure map → the app\'s name hides them.\n• In a stop\'s menu: Next departures reloads them, Full day lists the rest of today by route, Show in Companion opens the stop here.\n• Configure screen → widgets: Next departure, for the stop you last opened. Tap it for the full timetable.\n• Main menu: Transit timetables opens the search below.</string>
     <string name="tt_search_hint">Find a stop</string>
     <string name="tt_near_map">Near OsmAnd\'s map center</string>
     <string name="tt_near_map_empty">Open OsmAnd\'s map somewhere in Estonia to see the stops there, or search by name.</string>
@@ -16,6 +16,9 @@
     <string name="tt_widget_none">none today</string>
     <string name="tt_button_departures">Next departures</string>
     <string name="tt_button_full_day">Full day</string>
+    <string name="tt_button_show_in_app">Show in Companion</string>
+    <string name="tt_open_channel">Stops opened from OsmAnd</string>
+    <string name="tt_open_tap">Tap to open its timetable</string>
     <string name="tt_stop_type">%1$s stop</string>
     <string name="tt_stop_towards">%1$s · to %2$s</string>
     <string name="tt_no_departures">No departures in the next 24 hours</string>
@@ -26,6 +29,8 @@
     <string name="tt_load_failed">Couldn\'t load from peatus.ee: %1$s</string>
 
     <string name="tt_mode_bus">Bus</string>
+    <string name="tt_mode_trolleybus">Trolleybus</string>
+    <string name="tt_mode_regional">Regional bus</string>
     <string name="tt_mode_tram">Tram</string>
     <string name="tt_mode_train">Train</string>
     <string name="tt_mode_ferry">Ferry</string>

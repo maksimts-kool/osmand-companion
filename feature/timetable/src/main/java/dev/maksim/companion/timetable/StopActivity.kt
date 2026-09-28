@@ -30,7 +30,8 @@ import java.util.concurrent.Executors
  * A stop's timetable: live next departures, then every route's times for the chosen day, printed by hour like
  * at the stop itself. Tapping a departure or a minute opens that trip ([TripActivity]).
  *
- * OsmAnd opens this from the Next departure widget, so it's exported.
+ * OsmAnd opens this from the Next departure widget, so it's exported. Its stop menu's Show in Companion button
+ * opens it too, from [TimetableFeature].
  */
 class StopActivity : AppCompatActivity() {
 
@@ -84,6 +85,16 @@ class StopActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         load()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumedStopId = stopId
+    }
+
+    override fun onPause() {
+        resumedStopId = null
+        super.onPause()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -220,6 +231,11 @@ class StopActivity : AppCompatActivity() {
         private const val DAYS = 7
         private const val NEXT_DEPARTURES = 8
         private const val SHOW_ZOOM = 17
+
+        /** The stop on screen, if any; tells [TimetableFeature] whether Android let it open this. */
+        @Volatile
+        var resumedStopId: String? = null
+            private set
 
         fun intent(context: Context, stopId: String, stopName: String?): Intent =
             Intent().setClassName(context.packageName, StopActivity::class.java.name)

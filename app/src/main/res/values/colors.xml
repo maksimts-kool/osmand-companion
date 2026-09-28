@@ -1,4 +1,7 @@
 <resources>
     <color name="brand">#1E88E5</color>
     <color name="ic_launcher_background">#1E88E5</color>
+    <color name="status_ok">#43A047</color>
+    <color name="status_warning">#FB8C00</color>
+    <color name="status_error">#E53935</color>
 </resources>

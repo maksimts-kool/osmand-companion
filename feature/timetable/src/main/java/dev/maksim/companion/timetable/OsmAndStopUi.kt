@@ -36,7 +36,8 @@ import net.osmand.aidlapi.search.SearchResult
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
  *    has a switch for it). Tapping a stop shows its name, which way it goes, and the next departures as the
  *    menu's detail rows;
- *  - two buttons in that menu: "Next departures" reloads them now, "Full day" lists the rest of today by route;
+ *  - three buttons in that menu: "Next departures" reloads them now, "Full day" lists the rest of today by route,
+ *    "Show in Companion" opens the stop's full timetable in this app;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
  *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
@@ -203,6 +204,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         return listOf(
             row(BUTTON_DEPARTURES, R.string.tt_button_departures, "ic_action_update"),
             row(BUTTON_FULL_DAY, R.string.tt_button_full_day, "ic_action_time"),
+            row(BUTTON_SHOW_IN_APP, R.string.tt_button_show_in_app, "ic_action_external_link"),
         )
     }
 
@@ -219,6 +221,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     companion object {
         const val BUTTON_DEPARTURES = 1
         const val BUTTON_FULL_DAY = 2
+        const val BUTTON_SHOW_IN_APP = 3
 
         /** Opens this app's stop search; OsmAnd's main menu item points here. */
         const val DEEP_LINK = "osmandcompanion://timetable"

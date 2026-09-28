@@ -16,9 +16,12 @@ data class Stop(
     val code: String?,
     val lat: Double,
     val lon: Double,
-    /** BUS, TRAM, RAIL, FERRY...; null when nothing serves the stop anymore. */
+    /**
+     * BUS, TRAM, RAIL, FERRY...; null when nothing serves the stop anymore. A bus stop only trolleybuses or only
+     * regional buses serve says so instead: [PeatusClient.TROLLEYBUS], [PeatusClient.REGIONAL].
+     */
     val mode: String?,
-    /** Short names of the routes serving it; only filled by [PeatusClient.searchStops]. */
+    /** Short names of the routes serving it. */
     val routes: List<String> = emptyList(),
     /** Upcoming departures, soonest first; only filled by queries that ask for them. */
     val departures: List<Departure> = emptyList(),
@@ -105,22 +108,16 @@ class PeatusClient {
         return data.optJSONObject("stop")?.let { stopOf(it, departures) }
     }
 
-    /** Stops whose name contains [name], in Estonia and still served, with the routes that serve them. */
+    /** Stops whose name contains [name], in Estonia and still served. */
     fun searchStops(name: String, max: Int): List<Stop> {
         val query = """
             query(${'$'}name: String!, ${'$'}max: Int!) {
-              stops(name: ${'$'}name, maxResults: ${'$'}max) { $STOP routes { shortName } }
+              stops(name: ${'$'}name, maxResults: ${'$'}max) { $STOP }
             }
         """
         val data = request(query, JSONObject().put("name", name).put("max", max))
         return data.getJSONArray("stops").objects()
-            .map { json ->
-                val routes = json.getJSONArray("routes").objects()
-                    .map { it.getString("shortName") }
-                    .distinct()
-                    .sortedWith(RouteOrder)
-                stopOf(json, 0).copy(routes = routes)
-            }
+            .map { stopOf(it, 0) }
             .filter { it.mode != null && Estonia.contains(it.lat, it.lon) }
     }
 
@@ -131,7 +128,7 @@ class PeatusClient {
               stop(id: ${'$'}id) {
                 $STOP
                 stoptimesForServiceDate(date: ${'$'}date, omitNonPickups: true) {
-                  pattern { headsign route { shortName longName mode } }
+                  pattern { headsign route { $ROUTE longName } }
                   stoptimes { scheduledDeparture serviceDay headsign trip { gtfsId } }
                 }
               }
@@ -145,7 +142,7 @@ class PeatusClient {
         for (pattern in json.getJSONArray("stoptimesForServiceDate").objects()) {
             val route = pattern.getJSONObject("pattern").getJSONObject("route")
             val shortName = route.getString("shortName")
-            val mode = route.optString("mode")
+            val mode = modeOf(route)
             for (time in pattern.getJSONArray("stoptimes").objects()) {
                 val headsign = time.optNullableString("headsign")
                     ?: pattern.getJSONObject("pattern").optNullableString("headsign")
@@ -170,7 +167,7 @@ class PeatusClient {
         val query = """
             query(${'$'}id: String!, ${'$'}date: String!) {
               trip(id: ${'$'}id) {
-                gtfsId tripHeadsign route { shortName longName mode }
+                gtfsId tripHeadsign route { $ROUTE longName }
                 stoptimesForDate(serviceDate: ${'$'}date) {
                   scheduledDeparture realtimeDeparture realtime serviceDay stop { $STOP }
                 }
@@ -184,7 +181,7 @@ class PeatusClient {
         return Trip(
             id = json.getString("gtfsId"),
             route = route.getString("shortName"),
-            mode = route.optString("mode"),
+            mode = modeOf(route),
             headsign = json.optNullableString("tripHeadsign") ?: "",
             longName = route.optString("longName"),
             serviceDay = times.firstOrNull()?.getLong("serviceDay") ?: 0L,
@@ -201,13 +198,18 @@ class PeatusClient {
 
     private fun stopOf(json: JSONObject, departures: Int): Stop {
         val name = json.getString("name")
+        val routes = json.optJSONArray("routes")?.objects().orEmpty()
+        val vehicleMode = json.optNullableString("vehicleMode")
+        // peatus.ee calls every road vehicle a bus; a stop gets the finer kind only if all its routes share it.
+        val kind = routes.map(::modeOf).distinct().singleOrNull()
         return Stop(
             id = json.getString("gtfsId"),
             name = name,
             code = json.optNullableString("code"),
             lat = json.getDouble("lat"),
             lon = json.getDouble("lon"),
-            mode = json.optNullableString("vehicleMode"),
+            mode = kind?.takeIf { vehicleMode == "BUS" && (it == TROLLEYBUS || it == REGIONAL) } ?: vehicleMode,
+            routes = routes.map { it.getString("shortName") }.distinct().sortedWith(RouteOrder),
             departures = json.optJSONArray("stoptimesWithoutPatterns")?.objects().orEmpty()
                 .map(::departureOf)
                 .filterNot { isArrival(name, it.headsign) }
@@ -221,13 +223,28 @@ class PeatusClient {
         return Departure(
             tripId = trip.getString("gtfsId"),
             route = route.getString("shortName"),
-            mode = route.optString("mode"),
+            mode = modeOf(route),
             headsign = json.optNullableString("headsign") ?: trip.optNullableString("tripHeadsign") ?: "",
             serviceDay = json.getLong("serviceDay"),
             scheduled = json.getInt("scheduledDeparture"),
             expected = json.getInt("realtimeDeparture"),
             isRealtime = json.optBoolean("realtime"),
         )
+    }
+
+    /**
+     * The route's mode, except that buses are split further. The feed marks every trolleybus and every bus as BUS;
+     * trolleybuses are told apart by their id (Tallinn's "tallinna-lin_trol_72"), regional buses by peatus.ee's
+     * route color, which is red for city buses and something else for county and long-distance lines.
+     */
+    private fun modeOf(route: JSONObject): String {
+        val mode = route.optString("mode")
+        if (mode != "BUS") return mode
+        return when {
+            "_trol_" in route.optString("gtfsId") -> TROLLEYBUS
+            route.optNullableString("color")?.lowercase(Locale.ROOT)?.let { it !in CITY_BUS_COLORS } == true -> REGIONAL
+            else -> mode
+        }
     }
 
     /**
@@ -268,16 +285,25 @@ class PeatusClient {
         }
     }
 
-    private companion object {
-        const val ENDPOINT = "https://api.peatus.ee/routing/v1/routers/estonia/index/graphql"
+    companion object {
+        /** Our own modes, alongside OpenTripPlanner's: see [modeOf]. */
+        const val TROLLEYBUS = "TROLLEYBUS"
+        const val REGIONAL = "REGIONAL"
+
+        private const val ENDPOINT = "https://api.peatus.ee/routing/v1/routers/estonia/index/graphql"
 
         /** Arrivals at the end of a line are dropped after the fact, so ask for a few more. */
-        const val EXTRA_FOR_ARRIVALS = 4
+        private const val EXTRA_FOR_ARRIVALS = 4
 
-        const val STOP = "gtfsId name code lat lon vehicleMode"
-        const val NEXT = "stoptimesWithoutPatterns(numberOfDepartures: \$n, omitNonPickups: true) {" +
+        /** peatus.ee's colors for city buses: municipal (Tallinn, Tartu, Narva...) and commercial ones. */
+        private val CITY_BUS_COLORS = setOf("de2c42", "bd4819")
+
+        /** What [modeOf] needs to know about a route. */
+        private const val ROUTE = "gtfsId shortName mode color"
+        private const val STOP = "gtfsId name code lat lon vehicleMode routes { $ROUTE }"
+        private const val NEXT = "stoptimesWithoutPatterns(numberOfDepartures: \$n, omitNonPickups: true) {" +
             " scheduledDeparture realtimeDeparture realtime serviceDay headsign" +
-            " trip { gtfsId tripHeadsign route { shortName mode } } }"
+            " trip { gtfsId tripHeadsign route { $ROUTE } } }"
     }
 }
 

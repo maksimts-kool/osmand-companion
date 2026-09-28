@@ -44,6 +44,8 @@ fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Doub
 /** Kinds of vehicle as peatus.ee names them (OpenTripPlanner modes), with how we show them. */
 enum class Mode(val color: Int, val icon: Int, val label: Int, val osmandIcon: String) {
     BUS(0xFF00897B.toInt(), R.drawable.tt_ic_bus, R.string.tt_mode_bus, "ic_action_bus_dark"),
+    TROLLEYBUS(0xFF1E88E5.toInt(), R.drawable.tt_ic_trolleybus, R.string.tt_mode_trolleybus, "ic_action_transport_trolley"),
+    REGIONAL(0xFF8E24AA.toInt(), R.drawable.tt_ic_bus, R.string.tt_mode_regional, "ic_action_bus_dark"),
     TRAM(0xFFE53935.toInt(), R.drawable.tt_ic_tram, R.string.tt_mode_tram, "ic_action_transport_tram"),
     RAIL(0xFFF57C00.toInt(), R.drawable.tt_ic_train, R.string.tt_mode_train, "ic_action_train"),
     FERRY(0xFF3949AB.toInt(), R.drawable.tt_ic_ferry, R.string.tt_mode_ferry, "ic_action_sail_boat_dark"),
@@ -52,7 +54,9 @@ enum class Mode(val color: Int, val icon: Int, val label: Int, val osmandIcon: S
 
     companion object {
         fun of(mode: String?): Mode = when (mode) {
-            "BUS", "TROLLEYBUS", "COACH" -> BUS
+            "BUS" -> BUS
+            PeatusClient.TROLLEYBUS -> TROLLEYBUS
+            PeatusClient.REGIONAL, "COACH" -> REGIONAL
             "TRAM" -> TRAM
             "RAIL", "SUBWAY" -> RAIL
             "FERRY" -> FERRY

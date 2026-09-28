@@ -1,8 +1,15 @@
 package dev.maksim.companion.timetable
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.edit
 import dev.maksim.companion.core.AppLog
 import dev.maksim.companion.core.BackgroundFeature
@@ -147,6 +154,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             val now = System.currentTimeMillis()
             try {
                 when (button) {
+                    OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId)
                     OsmAndStopUi.BUTTON_DEPARTURES -> {
                         val stop = peatus.stop(stopId, MENU_DEPARTURES) ?: return@post
                         nearbyStops = nearbyStops.map { if (it.id == stopId) stop.copy(departures = stop.departures.take(DEPARTURES)) else it }
@@ -167,8 +175,57 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         }
     }
 
+    /**
+     * Opens the stop's timetable here. OsmAnd is in front, so Android may refuse to start our activity from the
+     * background (10+); if it hasn't shown up shortly, a notification opens it instead.
+     */
+    private fun showInApp(stopId: String) {
+        val name = nearbyStops.find { it.id == stopId }?.name
+        val intent = StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        handler?.postDelayed({
+            if (StopActivity.resumedStopId != stopId) notifyOpen(intent, name)
+        }, OPEN_CHECK_MS)
+    }
+
+    private fun notifyOpen(intent: Intent, name: String?) {
+        val notifications = NotificationManagerCompat.from(context)
+        if (!notifications.areNotificationsEnabled()) {
+            AppLog.log("Timetables: Android didn't let us open the stop from OsmAnd, and notifications are off")
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 26) {
+            val channel = NotificationChannel(
+                OPEN_CHANNEL_ID, context.getString(R.string.tt_open_channel), NotificationManager.IMPORTANCE_HIGH,
+            )
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+        val notification = NotificationCompat.Builder(context, OPEN_CHANNEL_ID)
+            .setSmallIcon(dev.maksim.companion.core.R.drawable.ic_notification)
+            .setContentTitle(name ?: context.getString(R.string.tt_feature_title))
+            .setContentText(context.getString(R.string.tt_open_tap))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setTimeoutAfter(OPEN_NOTIFICATION_TIMEOUT_MS)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .build()
+        try {
+            notifications.notify(OPEN_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            AppLog.log("Timetables: can't post notification: ${e.message}")
+        }
+    }
+
     private companion object {
         const val KEY_ENABLED = "enabled"
+        const val OPEN_CHANNEL_ID = "timetable_open"
+        const val OPEN_NOTIFICATION_ID = 2
+        val OPEN_CHECK_MS = TimeUnit.SECONDS.toMillis(2)
+        val OPEN_NOTIFICATION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1)
         val TICK_MS = TimeUnit.SECONDS.toMillis(4)
         val REFRESH_MS = TimeUnit.SECONDS.toMillis(60)
 

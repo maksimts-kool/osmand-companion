@@ -61,6 +61,7 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and the next departures as detail rows: `20:14  5 → Metsakooli · 3 min · live`. When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
 | **Stop menu → Next departures** | Reloads them right now, 10 of them. |
 | **Stop menu → Full day** | The rest of today by route: `5 → Metsakooli: 20:14 20:34 20:54 …` |
+| **Stop menu → Show in Companion** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*) |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
 | **Main menu → Transit timetables** | Opens this app's stop search. |
 | **Configure map** | The *OsmAnd Companion* item shows or hides the stops. |
