@@ -1,4 +1,4 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.routelogger
 
 import net.osmand.aidlapi.gpx.AGpxFile
 import net.osmand.aidlapi.gpx.AGpxFileDetails

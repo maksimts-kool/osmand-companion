@@ -1,4 +1,4 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.core
 
 import android.content.ComponentName
 import android.content.Context
@@ -10,12 +10,12 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.RemoteException
 import net.osmand.aidlapi.IOsmAndAidlInterface
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * Owns the AIDL connection to OsmAnd.
+ * Owns the AIDL connection to OsmAnd, shared by every feature.
  *
  * OsmAnd exposes its API as a bound service (action [SERVICE_ACTION]) inside the OsmAnd app itself.
- * We only read from it (the list of saved tracks), so no callback object is needed.
  */
 class OsmAndConnection(private val context: Context) {
 
@@ -23,8 +23,13 @@ class OsmAndConnection(private val context: Context) {
         fun onConnectionChanged(connected: Boolean)
     }
 
+    fun interface AccessListener {
+        fun onAccessGranted()
+    }
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val listeners = mutableSetOf<Listener>()
+    private val accessListeners = CopyOnWriteArraySet<AccessListener>()
 
     @Volatile
     var api: IOsmAndAidlInterface? = null
@@ -33,6 +38,9 @@ class OsmAndConnection(private val context: Context) {
         private set
     val isConnected: Boolean get() = api != null
 
+    /** Our own package; OsmAnd wants it in params that belong to an app (menu buttons, drawer items). */
+    val appPackage: String get() = context.packageName
+
     /**
      * OsmAnd keeps every third-party app switched OFF until the user enables it in
      * OsmAnd → Menu → Plugins. While off, every call quietly returns false/null.
@@ -40,9 +48,7 @@ class OsmAndConnection(private val context: Context) {
     @Volatile
     var hasAccess = false
         private set
-
-    /** Invoked on the main thread each time API access becomes available (connect, or user enabled us). */
-    var onAccessGranted: (() -> Unit)? = null
+    private var loggedNoAccess = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
@@ -63,6 +69,14 @@ class OsmAndConnection(private val context: Context) {
 
     fun addListener(listener: Listener) = listeners.add(listener)
     fun removeListener(listener: Listener) = listeners.remove(listener)
+
+    /**
+     * Called on the main thread each time API access becomes available: on (re)connect, or once the user
+     * enables us in OsmAnd. OsmAnd forgets map layers, widgets and menu buttons when its process dies,
+     * so features add theirs again from here.
+     */
+    fun addAccessListener(listener: AccessListener) = accessListeners.add(listener)
+    fun removeAccessListener(listener: AccessListener) = accessListeners.remove(listener)
 
     private fun notifyListeners() = mainHandler.post { listeners.forEach { it.onConnectionChanged(isConnected) } }
 
@@ -91,7 +105,7 @@ class OsmAndConnection(private val context: Context) {
 
     /**
      * Probes access with getAppInfo() (null when this app is disabled in OsmAnd).
-     * Call it again when the user returns from OsmAnd; fires [onAccessGranted] once access appears.
+     * Call it again when the user returns from OsmAnd; notifies access listeners once access appears.
      * Must be called on the main thread.
      */
     fun checkAccess(): Boolean {
@@ -103,9 +117,15 @@ class OsmAndConnection(private val context: Context) {
         }
         if (granted && !hasAccess) {
             hasAccess = true
-            onAccessGranted?.invoke()
+            loggedNoAccess = false
+            accessListeners.forEach { it.onAccessGranted() }
         } else if (!granted) {
-            AppLog.log("No API access: enable Route Logger in OsmAnd → Menu → Plugins")
+            // Checked periodically while a feature runs, so only say it once.
+            if (!loggedNoAccess) {
+                val label = context.applicationInfo.loadLabel(context.packageManager)
+                AppLog.log("No API access: enable $label in OsmAnd → Menu → Plugins")
+                loggedNoAccess = true
+            }
             hasAccess = false
         }
         return granted

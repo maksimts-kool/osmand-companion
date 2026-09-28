@@ -1,4 +1,4 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.core
 
 import android.os.Handler
 import android.os.Looper
@@ -8,8 +8,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Process-wide log: logcat plus the last [MAX_LINES] lines for the log view in [MainActivity].
- * The watcher and the Telegram worker run without any activity, so the history lives here.
+ * Process-wide log: logcat plus the last [MAX_LINES] lines for the log screen.
+ * Background features run without any activity, so the history lives here.
  */
 object AppLog {
 
@@ -17,7 +17,7 @@ object AppLog {
         fun onLog(line: String)
     }
 
-    private const val TAG = "RouteLogger"
+    private const val TAG = "Companion"
     private const val MAX_LINES = 200
 
     private val mainHandler = Handler(Looper.getMainLooper())

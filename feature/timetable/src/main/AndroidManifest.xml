@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Exported: OsmAnd's Next departure widget opens it. -->
+        <activity
+            android:name=".StopActivity"
+            android:exported="true" />
+
+        <activity
+            android:name=".TripActivity"
+            android:exported="false" />
+
+        <!-- OsmAnd reads the stop icons for its map from here; see StopIconProvider. -->
+        <provider
+            android:name=".StopIconProvider"
+            android:authorities="${applicationId}.stopicons"
+            android:exported="true" />
+    </application>
+</manifest>

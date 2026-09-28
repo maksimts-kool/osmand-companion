@@ -1,0 +1,4 @@
+<resources>
+    <string name="core_notification_channel">Background features</string>
+    <string name="core_notification_title">Connected to OsmAnd</string>
+</resources>

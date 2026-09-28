@@ -1,0 +1,22 @@
+<resources>
+    <string name="rl_feature_title">Trip summaries</string>
+    <string name="rl_intro">Sends a summary of each trip you record in OsmAnd to your Telegram chat when you tap Finish.</string>
+
+    <string name="rl_telegram">Telegram</string>
+    <string name="rl_telegram_hint">Create a bot with @BotFather and paste its token. Then send /start to your bot and tap Detect to fill in your chat id.</string>
+    <string name="rl_bot_token">Bot token</string>
+    <string name="rl_chat_id">Chat id</string>
+    <string name="rl_detect">Detect</string>
+    <string name="rl_save">Save</string>
+    <string name="rl_saved">Saved</string>
+    <string name="rl_send_test">Send test</string>
+    <string name="rl_test_message">✅ Route Logger is connected. Trip summaries will arrive here.</string>
+    <string name="rl_token_missing">Enter the bot token first</string>
+    <string name="rl_telegram_missing">Enter the bot token and chat id first</string>
+    <string name="rl_no_messages_for_bot">the bot has no messages yet, send it /start and try again</string>
+
+    <string name="rl_watch">Send a summary when a recording is saved</string>
+    <string name="rl_watch_hint">Reports each track trip recording saves to tracks/rec when you tap Finish. Pausing sends nothing. Only tracks that end after you first turn this on are reported.</string>
+    <string name="rl_check_now">Check now</string>
+    <string name="rl_resend_latest">Resend latest</string>
+</resources>

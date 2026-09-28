@@ -1,6 +1,8 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.routelogger
 
 import android.content.Context
+import dev.maksim.companion.core.AppLog
+import dev.maksim.companion.core.OsmAndConnection
 import net.osmand.aidlapi.gpx.AGpxFile
 import java.util.concurrent.TimeUnit
 
@@ -13,12 +15,12 @@ import java.util.concurrent.TimeUnit
  * list returned by `getImportedGpx`. Pausing writes nothing, so it's naturally ignored.
  * We poll that list and report every recorded track we haven't reported yet.
  */
-class TrackWatcher(private val context: Context, private val osmand: OsmAndConnection, private val settings: Settings) {
+class TrackWatcher(private val context: Context, private val osmand: OsmAndConnection, private val settings: RouteLoggerSettings) {
 
     /** Polls a new track has been seen without statistics; we wait a little for OsmAnd to analyze it. */
     private val waitingForDetails = mutableMapOf<String, Int>()
 
-    /** Reports every recorded track that ended after [Settings.watchingSince] and wasn't reported yet. */
+    /** Reports every recorded track that ended after [RouteLoggerSettings.watchingSince] and wasn't reported yet. */
     @Synchronized
     fun poll() {
         if (settings.watchingSince == 0L) settings.watchingSince = System.currentTimeMillis()

@@ -1,10 +1,10 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.routelogger
 
 import android.content.Context
 import androidx.core.content.edit
 
 /** Everything the app remembers, in one SharedPreferences file. */
-class Settings(context: Context) {
+class RouteLoggerSettings(context: Context) {
 
     private val prefs = context.getSharedPreferences("route_logger", Context.MODE_PRIVATE)
 
@@ -18,7 +18,7 @@ class Settings(context: Context) {
 
     val telegramConfigured: Boolean get() = botToken.isNotEmpty() && chatId.isNotEmpty()
 
-    /** Whether [WatcherService] should run (survives reboots via [BootReceiver]). */
+    /** Whether the feature is on, i.e. [RouteLoggerFeature] runs in the background. */
     var watching: Boolean
         get() = prefs.getBoolean(KEY_WATCHING, false)
         set(value) = prefs.edit { putBoolean(KEY_WATCHING, value) }

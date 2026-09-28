@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One line in a list: a departure, a stop of a trip, or a search result. Unused parts are hidden in code. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal"
+    android:paddingVertical="6dp">
+
+    <TextView
+        android:id="@+id/time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:minWidth="52dp"
+        android:maxLines="1"
+        android:fontFeatureSettings="tnum"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        tools:text="20:14" />
+
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginEnd="12dp"
+        android:importantForAccessibility="no"
+        android:padding="5dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/tt_badge_bg"
+        android:minWidth="40dp"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:gravity="center"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:textColor="@android:color/white"
+        tools:text="5" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
+            tools:text="Metsakooli" />
+
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:visibility="gone"
+            tools:text="Bus · 3, 5, 40"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/note"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="end"
+        android:textAppearance="?attr/textAppearanceLabelMedium"
+        tools:text="3 min" />
+</LinearLayout>

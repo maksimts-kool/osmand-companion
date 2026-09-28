@@ -1,34 +1,16 @@
 <resources>
-    <string name="app_name">Route Logger</string>
+    <string name="app_name">OsmAnd Companion</string>
     <string name="status_connected">Connected to %1$s</string>
-    <string name="status_no_access">Connected to %1$s, but access is off.\nIn OsmAnd open Menu → Plugins and tap “Route Logger” to enable it.</string>
+    <string name="status_no_access">Connected to %1$s, but access is off.\nIn OsmAnd open Menu → Plugins and tap “OsmAnd Companion” to enable it.</string>
     <string name="status_disconnected">Not connected to OsmAnd</string>
     <string name="osmand_missing">OsmAnd is not installed. Install OsmAnd or OsmAnd+ first.</string>
     <string name="connect">Connect</string>
     <string name="open_osmand">Open OsmAnd</string>
 
-    <string name="telegram">Telegram</string>
-    <string name="telegram_hint">Create a bot with @BotFather and paste its token. Then send /start to your bot and tap Detect to fill in your chat id.</string>
-    <string name="bot_token">Bot token</string>
-    <string name="chat_id">Chat id</string>
-    <string name="detect">Detect</string>
-    <string name="save">Save</string>
-    <string name="saved">Saved</string>
-    <string name="send_test">Send test</string>
-    <string name="test_message">✅ Route Logger is connected. Trip summaries will arrive here.</string>
-    <string name="token_missing">Enter the bot token first</string>
-    <string name="telegram_missing">Enter the bot token and chat id first</string>
-    <string name="no_messages_for_bot">the bot has no messages yet, send it /start and try again</string>
-
-    <string name="watch">Send a summary when a recording is saved</string>
-    <string name="watch_hint">Reports each track trip recording saves to tracks/rec when you tap Finish. Pausing sends nothing. Only tracks that end after you first turn this on are reported.</string>
-    <string name="check_now">Check now</string>
-    <string name="resend_latest">Resend latest</string>
+    <string name="tab_trips">Trips</string>
+    <string name="tab_timetables">Timetables</string>
+    <string name="tab_log">Log</string>
 
     <string name="log">Log</string>
     <string name="clear">Clear</string>
-
-    <string name="notification_channel">Recording watcher</string>
-    <string name="notification_title">Watching OsmAnd trip recordings</string>
-    <string name="notification_text">A summary goes to Telegram when you finish a recording.</string>
 </resources>

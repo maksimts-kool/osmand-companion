@@ -3,15 +3,17 @@ plugins {
 }
 
 android {
-    namespace = "dev.maksim.routelogger"
+    namespace = "dev.maksim.companion"
     compileSdk = 36
 
     defaultConfig {
+        // Kept from when the app was only Route Logger, so an update keeps its settings
+        // and the permission granted in OsmAnd → Plugins.
         applicationId = "dev.maksim.routelogger"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
     }
 
     buildTypes {
@@ -31,11 +33,7 @@ android {
 }
 
 dependencies {
-    // OsmAnd AIDL API (parcelables + IOsmAndAidlInterface). Same artifact the official osmand-api-demo uses.
-    implementation("net.osmand:android-aidl-lib:master-snapshot@aar")
-
-    implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("com.google.android.material:material:1.14.0")
-    // Retries Telegram delivery until the network is back.
-    implementation("androidx.work:work-runtime:2.12.0")
+    implementation(project(":core"))
+    implementation(project(":feature:routelogger"))
+    implementation(project(":feature:timetable"))
 }

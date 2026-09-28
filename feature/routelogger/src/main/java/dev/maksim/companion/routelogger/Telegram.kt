@@ -1,4 +1,4 @@
-package dev.maksim.routelogger
+package dev.maksim.companion.routelogger
 
 import android.content.Context
 import androidx.work.BackoffPolicy
@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import dev.maksim.companion.core.AppLog
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -76,7 +77,7 @@ class TelegramClient(private val token: String) {
 class TelegramWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
 
     override fun doWork(): Result {
-        val settings = Settings(applicationContext)
+        val settings = RouteLoggerSettings(applicationContext)
         val text = inputData.getString(KEY_TEXT) ?: return Result.failure()
         val label = inputData.getString(KEY_LABEL).orEmpty()
         if (!settings.telegramConfigured) {
