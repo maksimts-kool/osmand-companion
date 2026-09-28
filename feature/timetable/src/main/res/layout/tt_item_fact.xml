@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A small fact about a trip in its header card: "Mon 28 Sep", "22 stops", "38 min". -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="30dp"
+    android:layout_marginEnd="8dp"
+    android:background="@drawable/tt_pill_bg"
+    android:backgroundTint="?attr/colorSurface"
+    android:drawablePadding="6dp"
+    android:drawableTint="?attr/colorOnSurfaceVariant"
+    android:fontFeatureSettings="tnum"
+    android:gravity="center"
+    android:maxLines="1"
+    android:paddingHorizontal="12dp"
+    android:textAppearance="?attr/textAppearanceLabelLarge"
+    android:textColor="?attr/colorOnSurface"
+    tools:text="22 stops" />

@@ -2,18 +2,14 @@ package dev.maksim.companion.timetable
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
-import android.text.SpannableStringBuilder
-import android.text.Spanned
-import android.text.TextPaint
-import android.text.method.LinkMovementMethod
-import android.text.style.ClickableSpan
-import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
@@ -21,6 +17,7 @@ import dev.maksim.companion.core.companion
 import dev.maksim.companion.core.padForSystemBars
 import dev.maksim.companion.timetable.databinding.TtActivityStopBinding
 import dev.maksim.companion.timetable.databinding.TtItemHourBinding
+import dev.maksim.companion.timetable.databinding.TtItemMinuteBinding
 import dev.maksim.companion.timetable.databinding.TtItemRouteDayBinding
 import net.osmand.aidlapi.map.SetMapLocationParams
 import java.io.IOException
@@ -54,16 +51,15 @@ class StopActivity : AppCompatActivity() {
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
         day = savedInstanceState?.getInt(KEY_DAY) ?: 0
 
-        with(binding.toolbar) {
-            title = intent.getStringExtra(EXTRA_STOP_NAME)
-            setNavigationOnClickListener { finish() }
-            menu.add(R.string.tt_show_in_osmand).apply {
-                setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                setOnMenuItemClickListener {
-                    showInOsmand()
-                    true
-                }
-            }
+        with(binding.header) {
+            // Until the stop has loaded, the name OsmAnd gave will do.
+            title.text = intent.getStringExtra(EXTRA_STOP_NAME)
+            back.setOnClickListener { finish() }
+            action.isVisible = true
+            action.setIconResource(R.drawable.tt_ic_map)
+            action.contentDescription = getString(R.string.tt_show_in_osmand)
+            action.tooltipText = action.contentDescription
+            action.setOnClickListener { showInOsmand() }
         }
         for (i in 0 until DAYS) {
             val chip = Chip(this).apply {
@@ -135,8 +131,10 @@ class StopActivity : AppCompatActivity() {
             return
         }
         this.stop = stop
-        binding.toolbar.title = stop.name
-        binding.toolbar.subtitle = listOfNotNull(getString(Mode.of(stop.mode).label), stop.code).joinToString(" · ")
+        val mode = Mode.of(stop.mode)
+        val served = routes.map { it.route }.distinct().sortedWith(RouteOrder).joinToString(", ")
+        val about = listOfNotNull(stop.code, served.ifEmpty { null }).joinToString(" · ")
+        Rows.header(binding.header, mode, null, stop.name, about)
         val now = System.currentTimeMillis()
 
         if (next != null) {
@@ -169,6 +167,7 @@ class StopActivity : AppCompatActivity() {
 
     private fun addRoute(route: RouteDay, now: Long) {
         val item = TtItemRouteDayBinding.inflate(layoutInflater, binding.content, true)
+        val color = ColorStateList.valueOf(Mode.of(route.mode).color)
         Rows.badge(item.badge, route.route, route.mode)
         item.headsign.text = getString(R.string.tt_towards, route.headsign)
         item.longName.text = route.longName
@@ -176,30 +175,38 @@ class StopActivity : AppCompatActivity() {
         val upcoming = route.times.firstOrNull { TransitFormat.serviceTime(route.serviceDay, it.first) >= now }
         val nextTime = upcoming?.let { TransitFormat.serviceTime(route.serviceDay, it.first) }
         item.header.setOnClickListener { openTrip((upcoming ?: route.times.first()).second, route.serviceDay) }
+        val soon = nextTime?.let { TransitFormat.relative(this, it, now) }
+        item.next.text = if (soon == getString(R.string.tt_now)) soon else getString(R.string.tt_next_in, soon)
+        item.next.backgroundTintList = color.withAlpha(0x33)
+        item.next.isVisible = soon != null
 
         // Service times can pass 24:00; the clock hour puts 25:10 under 01 at the end, as printed timetables do.
-        val byHour = route.times.groupBy { Estonia.format("HH", TransitFormat.serviceTime(route.serviceDay, it.first)) }
-        for ((hour, times) in byHour) {
+        val hourOf = { seconds: Int -> Estonia.format("HH", TransitFormat.serviceTime(route.serviceDay, seconds)) }
+        val nextHour = upcoming?.let { hourOf(it.first) }
+        for ((hour, times) in route.times.groupBy { hourOf(it.first) }) {
             val line = TtItemHourBinding.inflate(layoutInflater, item.hours, true)
             line.hour.text = hour
-            val normal = line.minutes.currentTextColor
-            val past = ColorUtils.setAlphaComponent(normal, 0x66)
-            val text = SpannableStringBuilder()
+            if (hour == nextHour) {
+                line.hour.backgroundTintList = color
+                line.hour.setTextColor(Color.WHITE)
+            } else if (times.all { TransitFormat.serviceTime(route.serviceDay, it.first) < now }) {
+                line.hour.alpha = PAST_ALPHA
+            }
             for ((seconds, tripId) in times) {
                 val time = TransitFormat.serviceTime(route.serviceDay, seconds)
-                val start = text.length
-                text.append(Estonia.format("mm", time))
-                text.setSpan(object : ClickableSpan() {
-                    override fun onClick(widget: View) = openTrip(tripId, route.serviceDay)
-                    override fun updateDrawState(paint: TextPaint) {
-                        paint.color = if (time < now) past else normal
-                        paint.isFakeBoldText = time == nextTime
-                    }
-                }, start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                text.append("   ")
+                val minute = TtItemMinuteBinding.inflate(layoutInflater, line.minutes, true).root
+                minute.text = Estonia.format("mm", time)
+                minute.contentDescription = TransitFormat.clock(time)
+                minute.setOnClickListener { openTrip(tripId, route.serviceDay) }
+                if (time == nextTime) {
+                    minute.setBackgroundResource(R.drawable.tt_minute_bg)
+                    minute.backgroundTintList = color
+                    minute.setTextColor(Color.WHITE)
+                    minute.setTypeface(minute.typeface, Typeface.BOLD)
+                } else if (time < now) {
+                    minute.alpha = PAST_ALPHA
+                }
             }
-            line.minutes.text = text
-            line.minutes.movementMethod = LinkMovementMethod.getInstance()
         }
     }
 
@@ -231,6 +238,9 @@ class StopActivity : AppCompatActivity() {
         private const val DAYS = 7
         private const val NEXT_DEPARTURES = 8
         private const val SHOW_ZOOM = 17
+
+        /** Material's disabled-content opacity, for departures already gone. */
+        private const val PAST_ALPHA = 0.38f
 
         /** The stop on screen, if any; tells [TimetableFeature] whether Android let it open this. */
         @Volatile

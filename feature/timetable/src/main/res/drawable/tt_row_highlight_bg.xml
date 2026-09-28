@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind the stop you came from in a trip; tinted with the mode's color in code. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/white" />
+    <corners android:radius="16dp" />
+</shape>

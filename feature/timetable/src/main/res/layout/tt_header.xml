@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The header of the stop and trip screens: one card, tinted with the mode's color, with back, what you're
+     looking at, and an optional action. Filled in by Rows.header. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card"
+    style="?attr/materialCardViewFilledStyle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="8dp"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+    app:cardCornerRadius="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingVertical="12dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/back"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/tt_back"
+                app:icon="@drawable/tt_ic_back"
+                app:iconTint="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/badge"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="14dp"
+                android:background="@drawable/tt_hero_badge_bg"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:paddingHorizontal="12dp"
+                android:textAppearance="?attr/textAppearanceTitleLarge"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:drawableStart="@drawable/tt_ic_tram"
+                tools:text="T1"
+                tools:visibility="visible" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textStyle="bold"
+                    tools:text="→ Kadriorg" />
+
+                <TextView
+                    android:id="@+id/subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:visibility="gone"
+                    tools:text="Kopli - Kadriorg"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <!-- E.g. Show in OsmAnd on a stop; hidden where there's none. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/action"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:visibility="gone"
+                app:iconTint="?attr/colorOnSurface"
+                tools:icon="@drawable/tt_ic_map"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <!-- Small facts as pills, e.g. date, number of stops, how long it takes. -->
+        <LinearLayout
+            android:id="@+id/facts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

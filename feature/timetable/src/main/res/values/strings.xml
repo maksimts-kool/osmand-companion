@@ -45,9 +45,18 @@
     <string name="tt_next_departures">Next departures</string>
     <string name="tt_timetable_for">Timetable · %1$s</string>
     <string name="tt_towards">→ %1$s</string>
+    <string name="tt_next_in">in %1$s</string>
     <string name="tt_show_in_osmand">Show in OsmAnd</string>
     <string name="tt_osmand_missing">OsmAnd is not installed</string>
     <string name="tt_stop_unknown">peatus.ee doesn\'t know this stop</string>
     <string name="tt_trip_unknown">peatus.ee doesn\'t know this trip</string>
     <string name="tt_retry">Retry</string>
+    <string name="tt_back">Back</string>
+    <string name="tt_your_stop">Your stop</string>
+    <string name="tt_late">%1$d min late</string>
+    <string name="tt_early">%1$d min early</string>
+    <plurals name="tt_stops">
+        <item quantity="one">%1$d stop</item>
+        <item quantity="other">%1$d stops</item>
+    </plurals>
 </resources>
