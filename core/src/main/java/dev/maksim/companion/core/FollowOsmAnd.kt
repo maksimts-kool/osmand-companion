@@ -1,8 +1,8 @@
 package dev.maksim.companion.core
 
-import android.content.ComponentName
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
-import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import androidx.core.content.edit
 
 /**
@@ -23,13 +23,18 @@ object FollowOsmAnd {
     var isOsmAndActive = false
         internal set
 
-    /** Whether the user turned the watcher on in Android's accessibility settings. */
-    fun isWatcherOn(context: Context): Boolean {
-        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            ?: return false
-        val watcher = ComponentName(context, OsmAndWatcher::class.java)
-        return enabled.split(':').any { ComponentName.unflattenFromString(it) == watcher }
-    }
+    /** Set by [OsmAndWatcher] while Android has it running. */
+    @Volatile
+    internal var isWatcherRunning = false
+
+    /**
+     * Whether the user turned the watcher on in Android's accessibility settings. Asks Android rather than reading
+     * the setting itself, which some versions (15) don't let apps read.
+     */
+    fun isWatcherOn(context: Context): Boolean =
+        isWatcherRunning || context.getSystemService(AccessibilityManager::class.java)
+            ?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            ?.any { it.resolveInfo.serviceInfo.let { s -> s.packageName == context.packageName && s.name == OsmAndWatcher::class.java.name } } == true
 
     /** The user's choice; it only takes effect while the watcher is on, which is what starts things again. */
     fun stopWithOsmAnd(context: Context): Boolean =

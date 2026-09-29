@@ -96,7 +96,8 @@ or the main menu. OsmAnd starts those itself; Android doesn't let a background a
   and OsmAnd only talks to apps already connected to it, so this is an accessibility service (`OsmAndWatcher`),
   which the user turns on in Android's settings. It only gets the package of each window that comes to the front,
   never the window's contents, and keeps nothing. On Android 13+ a sideloaded app first needs *App info → ⋮ →
-  Allow restricted settings*.
+  Allow restricted settings*. Android turns the service off when the app is force-stopped (App info → Force stop),
+  so it has to be turned on again after that; being swiped away, killed or updated doesn't.
 - **Stop when OsmAnd closes** (needs the above): a minute after OsmAnd was last in front, the service and its
   notification stop, and Companion lets go of OsmAnd so it can close too (while bound, Android keeps it running).
   Companion's own screens over OsmAnd and keyboards don't count as leaving; before stopping it also asks OsmAnd

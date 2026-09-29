@@ -89,7 +89,10 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         handler?.run {
             removeCallbacks(tick)
             post {
-                if (registeredWith != null && osmand.hasAccess) ui.unregister()
+                if (registeredWith != null && osmand.hasAccess) {
+                    ui.unregister()
+                    AppLog.log("Timetables: took the stops out of OsmAnd")
+                }
                 registeredWith = null
             }
         }

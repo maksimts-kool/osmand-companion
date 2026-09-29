@@ -32,6 +32,7 @@ class OsmAndWatcher : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        FollowOsmAnd.isWatcherRunning = true
         AppLog.log("OsmAnd watcher on")
         // This app's process may have just (re)started with OsmAnd already in front: no window will say so.
         val osmand = companion.osmand
@@ -68,6 +69,7 @@ class OsmAndWatcher : AccessibilityService() {
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         handler.removeCallbacksAndMessages(null)
         // Off in the settings: everything runs as it did without the watcher.
+        FollowOsmAnd.isWatcherRunning = false
         FollowOsmAnd.isOsmAndActive = false
         update()
         AppLog.log("OsmAnd watcher off")
@@ -102,8 +104,9 @@ class OsmAndWatcher : AccessibilityService() {
         if (!FollowOsmAnd.stopWithOsmAnd(this) || !companion.features.any { it.isEnabled }) return
         AppLog.log("OsmAnd closed: stopping")
         update()
-        // Let OsmAnd go too: while connected, Android keeps it running, and brings it back if it's closed.
-        osmand.disconnect()
+        // Let OsmAnd go too: while connected, Android keeps it running, and brings it back if it's closed. Only once
+        // the features have taken their things out of OsmAnd, which they do on threads of their own.
+        handler.postDelayed({ if (!FollowOsmAnd.isOsmAndActive) osmand.disconnect() }, DISCONNECT_DELAY_MS)
     }
 
     /** Starts or stops the service to match; only logs if Android won't let it start from here. */
@@ -121,6 +124,9 @@ class OsmAndWatcher : AccessibilityService() {
         val STOP_AFTER_MS = TimeUnit.MINUTES.toMillis(1)
 
         private val STARTUP_CHECK_MS = TimeUnit.SECONDS.toMillis(2)
+
+        /** Plenty for the features to remove their layers, buttons and widgets from OsmAnd. */
+        private val DISCONNECT_DELAY_MS = TimeUnit.SECONDS.toMillis(3)
 
         /** Windows that come up over OsmAnd without it being left. */
         private val TRANSIENT_PACKAGES = setOf("com.android.systemui", "android")
