@@ -14,6 +14,7 @@ import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import dev.maksim.companion.core.companion
+import dev.maksim.companion.core.feature
 import dev.maksim.companion.core.padForSystemBars
 import dev.maksim.companion.timetable.databinding.TtActivityStopBinding
 import dev.maksim.companion.timetable.databinding.TtItemHourBinding
@@ -214,21 +215,26 @@ class StopActivity : AppCompatActivity() {
         startActivity(TripActivity.intent(this, tripId, serviceDay, stopId))
     }
 
-    /** Moves OsmAnd's map to the stop, where the timetable layer shows it, and switches to OsmAnd. */
+    /**
+     * Switches to OsmAnd with the stop's menu open on its map, as if it had been tapped there. With timetables
+     * off in OsmAnd there's no stop there to open, so the map just moves to it.
+     */
     private fun showInOsmand() {
         val stop = stop ?: return
         val osmand = companion.osmand
         val pkg = osmand.osmandPackage ?: osmand.findInstalledOsmand()
             ?: return Toast.makeText(this, R.string.tt_osmand_missing, Toast.LENGTH_LONG).show()
-        background.execute {
-            val moved = osmand.hasAccess && osmand.call("setMapLocation") {
+        // Runs on a background thread.
+        val open = { shown: Boolean ->
+            val moved = shown || osmand.hasAccess && osmand.call("setMapLocation") {
                 it.setMapLocation(SetMapLocationParams(stop.lat, stop.lon, SHOW_ZOOM, 0f, false))
             } == true
             // Without API access OsmAnd still understands a geo: link.
             val intent = if (moved) packageManager.getLaunchIntentForPackage(pkg)
             else Intent(Intent.ACTION_VIEW, Uri.parse("geo:${stop.lat},${stop.lon}?z=$SHOW_ZOOM")).setPackage(pkg)
-            runOnUiThread { intent?.let { startActivity(it) } }
+            runOnUiThread { if (!isDestroyed) intent?.let { startActivity(it) } }
         }
+        if (!feature<TimetableFeature>().showInOsmand(stop, open)) background.execute { open(false) }
     }
 
     companion object {

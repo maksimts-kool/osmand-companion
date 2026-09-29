@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        "Display over other apps": the only way Android (10+) lets us open the Full day sheet, or a stop here,
+        while OsmAnd is in front. Without it, a notification opens them instead.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application>
         <!-- Exported: OsmAnd's Next departure widget opens it. -->
         <activity
@@ -10,6 +16,15 @@
         <activity
             android:name=".TripActivity"
             android:exported="false" />
+
+        <!-- Full day, over OsmAnd's map. Its own task, so closing it goes back to OsmAnd, not to this app. -->
+        <activity
+            android:name=".DaySheetActivity"
+            android:configChanges="uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="${applicationId}.sheet"
+            android:theme="@style/Theme.TtSheet" />
 
         <!-- OsmAnd reads the stop icons for its map from here; see StopIconProvider. -->
         <provider

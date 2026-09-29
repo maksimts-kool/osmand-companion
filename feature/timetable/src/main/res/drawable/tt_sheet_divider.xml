@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Between the routes in the Full day sheet, indented like OsmAnd's list dividers. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:insetLeft="16dp">
+    <shape android:shape="rectangle">
+        <solid android:color="@color/tt_osm_divider" />
+        <size android:height="1dp" />
+    </shape>
+</inset>

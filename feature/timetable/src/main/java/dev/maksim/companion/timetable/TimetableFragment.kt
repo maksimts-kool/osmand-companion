@@ -1,9 +1,13 @@
 package dev.maksim.companion.timetable
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -52,6 +56,12 @@ class TimetableFragment : Fragment() {
                 setEnabled(checked)
             }
         }
+        binding.overlayAllow.setOnClickListener {
+            val context = requireContext()
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
+            )
+        }
         binding.searchInput.doAfterTextChanged {
             mainHandler.removeCallbacks(searchLater)
             mainHandler.postDelayed(searchLater, SEARCH_DELAY_MS)
@@ -64,8 +74,10 @@ class TimetableFragment : Fragment() {
         }
     }
 
+    /** Also on coming back from Android's settings. */
     override fun onStart() {
         super.onStart()
+        updateOverlayCard()
         search()
     }
 
@@ -83,6 +95,13 @@ class TimetableFragment : Fragment() {
     private fun setEnabled(enabled: Boolean) {
         feature.isEnabled = enabled
         CompanionService.update(requireContext())
+        updateOverlayCard()
+    }
+
+    /** Asks for "display over other apps" (see the manifest) while timetables are on in OsmAnd. */
+    private fun updateOverlayCard() {
+        binding.overlayCard.isVisible =
+            feature.isEnabled && Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(requireContext())
     }
 
     /** Stops by name, or with no name typed, the stops around OsmAnd's map center. */
