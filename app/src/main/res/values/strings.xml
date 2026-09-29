@@ -16,4 +16,26 @@
 
     <string name="log">Log</string>
     <string name="clear">Clear</string>
+
+    <string name="version">Version %1$s</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_status_never">Not checked for updates yet</string>
+    <string name="update_status_up_to_date">Up to date · checked %1$s</string>
+    <string name="update_status_available">Version %1$s is available</string>
+    <string name="update_just_now">just now</string>
+    <string name="update_up_to_date">You have the latest version</string>
+    <string name="update_check_failed">Couldn’t check for updates: %1$s</string>
+    <string name="update_button">Update to %1$s</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_installing">Installing…</string>
+    <string name="update_dialog_title">Version %1$s is out</string>
+    <string name="update_installed_version">You have %1$s.</string>
+    <string name="update_now">Update</string>
+    <string name="update_later">Later</string>
+    <string name="update_release_page">On GitHub</string>
+    <string name="update_allow_install">Allow OsmAnd Companion to install apps, then go back to finish the update.</string>
+    <string name="update_channel">App updates</string>
+    <string name="update_notification_title">OsmAnd Companion %1$s is out</string>
+    <string name="update_notification_text">Tap to update</string>
 </resources>

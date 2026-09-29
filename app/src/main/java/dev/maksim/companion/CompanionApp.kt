@@ -6,6 +6,7 @@ import dev.maksim.companion.core.CompanionHost
 import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.routelogger.RouteLoggerFeature
 import dev.maksim.companion.timetable.TimetableFeature
+import dev.maksim.companion.update.Updater
 
 /** Holds the OsmAnd connection and the features for the whole process, shared by the UI and the service. */
 class CompanionApp : Application(), CompanionHost {
@@ -23,5 +24,6 @@ class CompanionApp : Application(), CompanionHost {
             TimetableFeature(this, osmand),
         )
         osmand.connect()
+        Updater.init(this)
     }
 }

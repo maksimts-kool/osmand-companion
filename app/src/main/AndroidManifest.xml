@@ -3,6 +3,9 @@
 
     <!-- Permissions, the background service and OsmAnd package visibility come from :core. -->
 
+    <!-- Updates from GitHub Releases (Updater); the user allows it once, on the first update. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- allowBackup off: the prefs hold the Telegram bot token. -->
     <application
         android:name=".CompanionApp"
@@ -30,5 +33,10 @@
                     android:scheme="osmandcompanion" />
             </intent-filter>
         </activity>
+
+        <!-- Result of an update's install session. -->
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
     </application>
 </manifest>

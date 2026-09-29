@@ -10,7 +10,8 @@ Both run on one connection to OsmAnd and one quiet background notification, whic
 
 ## Setup
 
-1. Build and install (see below), open **OsmAnd Companion**, tap *Connect*.
+1. Install the APK from the [latest release](https://github.com/maksimts-kool/osmand-maksimts/releases/latest)
+   (or build it, see below), open **OsmAnd Companion**, tap *Connect*.
 2. In OsmAnd open *Menu → Plugins* and tap **OsmAnd Companion — Third-party app** so it turns orange.
    OsmAnd blocks third-party apps until you do this.
 3. Turn on the features you want in the *Trips* and *Timetables* tabs.
@@ -99,10 +100,53 @@ or the main menu. OsmAnd starts those itself; Android doesn't let a background a
 - OsmAnd keeps layers, widgets and buttons in memory only, so they're added again whenever OsmAnd (re)connects.
 - A trip's last stop is also a "departure" in the feed (towards the stop itself); those are dropped.
 
+## Updates
+
+The app updates itself from this repo's [GitHub Releases](https://github.com/maksimts-kool/osmand-maksimts/releases):
+
+- It asks GitHub for the latest release when it opens (at most every 10 minutes) and once a day in the
+  background (WorkManager). The daily check posts a notification once per new version.
+- A newer version shows an *Update to x.y.z* button in the header and, once per version, a dialog with the
+  release notes. *Log* tab → *Check for updates* checks right away.
+- *Update* downloads the APK straight into an Android install session and checks it against the SHA-256
+  GitHub reports. The first time, Android asks you to allow *Install unknown apps* for this app, then to
+  confirm the update. On Android 12+ later updates usually install without asking.
+
+Android installs an update only if it's signed with the same key as the installed app. Builds made before
+2.0.0 was released on GitHub are signed with a local debug key, so uninstall that once and install the
+release APK. That clears the app's settings.
+
+## Releases
+
+Bump `appVersion` in `gradle.properties` if you like, then tag and push:
+
+```bash
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+The [Release workflow](.github/workflows/release.yml) builds the APK with the tag's version, signs it and
+publishes a GitHub release with notes generated from the merged PRs. Edit the notes on GitHub if needed: the
+app shows them in its update dialog. `versionCode` comes from the version (2.1.0 → 20100), so tags must go up
+and look like `vMAJOR.MINOR.PATCH` (each part 0–99).
+
+### Signing key
+
+Releases are signed with a key kept out of git. On the maintainer's machine:
+
+- `~/.android/osmand-companion-release.jks`: the key. **Back it up.** Without it, no installed copy can
+  be updated, and everyone would have to uninstall and lose their settings.
+- `keystore.properties` in the repo root (gitignored): its path and passwords. When it's there, debug builds
+  are signed with the same key too, so `adb install -r` and GitHub updates replace each other.
+
+CI gets the same key from the repository secrets `SIGNING_KEYSTORE_BASE64` (the .jks, base64),
+`SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`.
+
 ## Code map
 
 ```
-app/                      shell: home screen with a tab per feature, OsmAnd status, log
+app/                      shell: home screen with a tab per feature, OsmAnd status, log;
+                          update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
 core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog
 feature/routelogger/      RouteLoggerFeature, TrackWatcher, TrackSummary, Telegram, RouteLoggerFragment
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient,

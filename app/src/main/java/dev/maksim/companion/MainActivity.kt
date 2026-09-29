@@ -3,8 +3,13 @@ package dev.maksim.companion
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -12,18 +17,32 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.maksim.companion.core.CompanionService
 import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.databinding.ActivityMainBinding
 import dev.maksim.companion.routelogger.RouteLoggerFragment
 import dev.maksim.companion.timetable.OsmAndStopUi
 import dev.maksim.companion.timetable.TimetableFragment
+import dev.maksim.companion.update.Release
+import dev.maksim.companion.update.UpdateWorker
+import dev.maksim.companion.update.Updater
 
 /** Home: OsmAnd's connection status on top, one tab per feature, and the shared log. */
-class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
+class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Listener {
 
     private lateinit var binding: ActivityMainBinding
     private val app get() = application as CompanionApp
+
+    private var updateDialog: AlertDialog? = null
+
+    /** Opened from the "update available" notification: show the dialog even if it was shown before. */
+    private var updateRequested = false
+
+    /** Android 8+ asks once whether this app may install apps; the update continues when it may. */
+    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (canInstallUpdates()) Updater.available?.let { Updater.install(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +57,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
                 onConnectionChanged(app.osmand.isConnected)
             }
             openOsmandButton.setOnClickListener { openOsmand() }
+            updateButton.setOnClickListener { Updater.available?.let { showUpdateDialog(it) } }
             tabs.setOnItemSelectedListener {
                 showTab(it.itemId)
                 true
@@ -45,6 +65,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
         }
         if (savedInstanceState == null) {
             binding.tabs.selectedItemId = if (isTimetableLink(intent)) R.id.tab_timetables else R.id.tab_trips
+            updateRequested = isUpdateLink(intent)
+            Updater.checkIfStale()
         }
         // Covers the reboot-less case: the service was killed, or the app was reinstalled.
         CompanionService.update(this)
@@ -54,6 +76,10 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (isTimetableLink(intent)) binding.tabs.selectedItemId = R.id.tab_timetables
+        if (isUpdateLink(intent)) {
+            updateRequested = true
+            onUpdateChanged()
+        }
     }
 
     override fun onStart() {
@@ -62,11 +88,19 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
         // The user may have just enabled us in OsmAnd → Plugins; re-check on every return.
         app.osmand.checkAccess()
         onConnectionChanged(app.osmand.isConnected)
+        Updater.addListener(this)
+        onUpdateChanged()
     }
 
     override fun onStop() {
         app.osmand.removeListener(this)
+        Updater.removeListener(this)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        updateDialog?.dismiss()
+        super.onDestroy()
     }
 
     override fun onConnectionChanged(connected: Boolean) {
@@ -86,6 +120,49 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
             connectButton.setText(if (connected) R.string.connect_check else R.string.connect)
         }
     }
+
+    /** The header's update button follows the download; a new version pops up the dialog once. */
+    override fun onUpdateChanged() {
+        Updater.takeConfirmIntent()?.let { startActivity(it) }
+        val release = Updater.available
+        val progress = Updater.progress
+        with(binding.updateButton) {
+            isVisible = release != null
+            isEnabled = progress == null
+            text = when {
+                release == null -> null
+                progress == null -> getString(R.string.update_button, release.version)
+                progress >= 100 -> getString(R.string.update_installing)
+                else -> getString(R.string.update_downloading, progress)
+            }
+        }
+        if (release != null && progress == null && (updateRequested || Updater.shouldPrompt(release))) {
+            updateRequested = false
+            showUpdateDialog(release)
+        }
+    }
+
+    fun showUpdateDialog(release: Release) {
+        if (updateDialog?.isShowing == true) return
+        val installed = getString(R.string.update_installed_version, Updater.CURRENT_VERSION)
+        updateDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.update_dialog_title, release.version))
+            .setMessage(listOf(installed, release.plainNotes).filter { it.isNotEmpty() }.joinToString("\n\n"))
+            .setPositiveButton(R.string.update_now) { _, _ -> startUpdate(release) }
+            .setNegativeButton(R.string.update_later, null)
+            .setNeutralButton(R.string.update_release_page) { _, _ ->
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.pageUrl)))
+            }
+            .show()
+    }
+
+    private fun startUpdate(release: Release) {
+        if (canInstallUpdates()) return Updater.install(release)
+        toast(R.string.update_allow_install)
+        installPermission.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+    }
+
+    private fun canInstallUpdates() = Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls()
 
     /** "OsmAnd+" rather than "net.osmand.plus". */
     private fun osmandName(pkg: String?): String? = pkg?.let {
@@ -116,6 +193,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
     }
 
     private fun isTimetableLink(intent: Intent?) = intent?.data?.toString() == OsmAndStopUi.DEEP_LINK
+
+    private fun isUpdateLink(intent: Intent?) = intent?.getBooleanExtra(UpdateWorker.EXTRA_SHOW_UPDATE, false) == true
 
     /**
      * targetSdk 36 is always edge-to-edge: the header clears the status bar, the tabs the navigation bar, and

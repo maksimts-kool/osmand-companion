@@ -1,0 +1,48 @@
+name: Release
+
+# Pushing a tag like v2.1.0 builds the signed APK and publishes it as a GitHub release.
+# Installed apps find it through the GitHub API (Updater) and offer the update.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build signed APK
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_FILE: ${{ runner.temp }}/release.jks
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::error::The SIGNING_* secrets are missing (README → Releases)"
+            exit 1
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$SIGNING_STORE_FILE"
+          VERSION="${GITHUB_REF_NAME#v}"
+          ./gradlew assembleRelease -PappVersion="$VERSION"
+          cp app/build/outputs/apk/release/app-release.apk "osmand-companion-$VERSION.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "osmand-companion-$VERSION.apk" \
+            --title "$VERSION" --generate-notes --verify-tag
