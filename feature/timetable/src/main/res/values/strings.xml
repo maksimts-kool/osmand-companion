@@ -67,6 +67,7 @@
     <string name="tt_fold_show_all">Show the whole day</string>
     <string name="tt_fold_hide">Hide times</string>
     <string name="tt_route_line">Route %1$s</string>
+    <string name="tt_more_routes">%1$d more routes: show all</string>
     <string name="tt_route_in_osmand">Show route in OsmAnd</string>
     <string name="tt_route_outdated_title">OsmAnd\'s route may be out of date</string>
     <string name="tt_route_missing">OpenStreetMap, where OsmAnd\'s maps come from, has no route %1$s around here, so OsmAnd doesn\'t know it.</string>

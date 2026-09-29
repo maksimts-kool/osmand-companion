@@ -1,0 +1,4 @@
+<resources>
+    <!-- A view's own alpha, kept while HeaderLines fades it. -->
+    <item name="tt_base_alpha" type="id" />
+</resources>

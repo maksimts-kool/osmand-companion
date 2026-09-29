@@ -39,6 +39,7 @@ import java.util.concurrent.Executors
 class StopActivity : AppCompatActivity() {
 
     private lateinit var binding: TtActivityStopBinding
+    private lateinit var headerLines: HeaderLines
     private val peatus = PeatusClient()
     private val background = Executors.newSingleThreadExecutor()
 
@@ -68,6 +69,7 @@ class StopActivity : AppCompatActivity() {
         binding.root.padForSystemBars()
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
         day = savedInstanceState?.getInt(KEY_DAY) ?: 0
+        headerLines = HeaderLines(binding.header, binding.top, binding.scroll, binding.content)
 
         with(binding.header) {
             // Until the stop has loaded, the name OsmAnd gave will do.
@@ -163,6 +165,7 @@ class StopActivity : AppCompatActivity() {
             binding.header, mode, null, stop.name, about,
             lines = lines, running = routes.mapTo(HashSet()) { it.route }, onLine = { cards[it.name]?.invoke() },
         )
+        headerLines.refresh()
         val now = System.currentTimeMillis()
 
         if (next != null) {
@@ -297,7 +300,7 @@ class StopActivity : AppCompatActivity() {
             }
             val card = item.root
             binding.scroll.post {
-                binding.scroll.smoothScrollTo(0, maxOf(0, card.top - resources.getDimensionPixelSize(R.dimen.tt_jump_margin)))
+                binding.scroll.smoothScrollTo(0, headerLines.scrollTo(card, resources.getDimensionPixelSize(R.dimen.tt_jump_margin)))
                 card.animate().scaleX(PULSE).scaleY(PULSE).setDuration(PULSE_MS).withEndAction {
                     card.animate().scaleX(1f).scaleY(1f).setDuration(PULSE_MS).start()
                 }.start()

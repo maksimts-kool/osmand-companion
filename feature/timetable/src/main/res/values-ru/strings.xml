@@ -67,6 +67,7 @@
     <string name="tt_fold_show_all">Показать весь день</string>
     <string name="tt_fold_hide">Скрыть время</string>
     <string name="tt_route_line">Маршрут %1$s</string>
+    <string name="tt_more_routes">Ещё маршрутов: %1$d, показать все</string>
     <string name="tt_route_in_osmand">Показать маршрут в OsmAnd</string>
     <string name="tt_route_outdated_title">Маршрут в OsmAnd может быть устаревшим</string>
     <string name="tt_route_missing">В OpenStreetMap, откуда берутся карты OsmAnd, здесь нет маршрута %1$s, поэтому OsmAnd о нём не знает.</string>

@@ -99,15 +99,25 @@
         </LinearLayout>
 
         <!-- Small facts as pills (date, number of stops, how long it takes), or a stop's routes. Wraps. -->
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/facts"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:animateLayoutChanges="true"
-            android:paddingHorizontal="12dp"
-            android:visibility="gone"
-            app:chipSpacingHorizontal="8dp"
-            app:chipSpacingVertical="8dp" />
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/facts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:paddingHorizontal="12dp"
+                android:visibility="gone"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="8dp" />
+
+            <!-- A stop's routes folded to one row end in this; see HeaderLines. -->
+            <include
+                android:id="@+id/more"
+                layout="@layout/tt_item_line"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
