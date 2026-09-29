@@ -1,0 +1,40 @@
+<resources>
+    <string name="status_connected">Подключено к %1$s</string>
+    <string name="status_no_access">Доступ выключен в %1$s</string>
+    <string name="status_no_access_hint">В OsmAnd откройте Меню → Плагины и нажмите «OsmAnd Companion», чтобы включить его.</string>
+    <string name="status_disconnected">Нет подключения к OsmAnd</string>
+    <string name="status_disconnected_hint">Убедитесь, что OsmAnd или OsmAnd+ установлен, и нажмите «Подключить».</string>
+    <string name="osmand_missing">OsmAnd не установлен. Сначала установите OsmAnd или OsmAnd+.</string>
+    <string name="connect">Подключить</string>
+    <string name="connect_check">Проверить снова</string>
+    <string name="open_osmand">Открыть OsmAnd</string>
+
+    <string name="tab_trips">Поездки</string>
+    <string name="tab_timetables">Расписания</string>
+    <string name="tab_log">Журнал</string>
+
+    <string name="log">Журнал</string>
+    <string name="clear">Очистить</string>
+
+    <string name="version">Версия %1$s</string>
+    <string name="update_check">Проверить обновления</string>
+    <string name="update_checking">Проверка обновлений…</string>
+    <string name="update_status_never">Обновления ещё не проверялись</string>
+    <string name="update_status_up_to_date">Последняя версия · проверено %1$s</string>
+    <string name="update_status_available">Доступна версия %1$s</string>
+    <string name="update_just_now">только что</string>
+    <string name="update_up_to_date">У вас последняя версия</string>
+    <string name="update_check_failed">Не удалось проверить обновления: %1$s</string>
+    <string name="update_button">Обновить до %1$s</string>
+    <string name="update_downloading">Загрузка… %1$d%%</string>
+    <string name="update_installing">Установка…</string>
+    <string name="update_dialog_title">Вышла версия %1$s</string>
+    <string name="update_installed_version">Сейчас установлена %1$s.</string>
+    <string name="update_now">Обновить</string>
+    <string name="update_later">Позже</string>
+    <string name="update_release_page">На GitHub</string>
+    <string name="update_allow_install">Разрешите OsmAnd Companion устанавливать приложения, затем вернитесь, чтобы завершить обновление.</string>
+    <string name="update_channel">Обновления приложения</string>
+    <string name="update_notification_title">Вышел OsmAnd Companion %1$s</string>
+    <string name="update_notification_text">Нажмите, чтобы обновить</string>
+</resources>

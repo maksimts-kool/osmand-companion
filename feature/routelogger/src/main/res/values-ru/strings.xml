@@ -1,0 +1,52 @@
+<resources>
+    <string name="rl_feature_title">Сводки поездок</string>
+    <string name="rl_intro">Отправляет сводку каждой поездки, записанной в OsmAnd, в ваш чат Telegram, когда вы нажимаете «Завершить».</string>
+
+    <string name="rl_telegram">Telegram</string>
+    <string name="rl_telegram_hint">Создайте бота через @BotFather и вставьте его токен. Затем отправьте боту /start и нажмите «Определить», чтобы заполнить ID чата.</string>
+    <string name="rl_bot_token">Токен бота</string>
+    <string name="rl_chat_id">ID чата</string>
+    <string name="rl_detect">Определить</string>
+    <string name="rl_save">Сохранить</string>
+    <string name="rl_saved">Сохранено</string>
+    <string name="rl_send_test">Отправить тест</string>
+    <string name="rl_test_message">✅ Route Logger подключён. Сводки поездок будут приходить сюда.</string>
+    <string name="rl_token_missing">Сначала введите токен бота</string>
+    <string name="rl_telegram_missing">Сначала введите токен бота и ID чата</string>
+    <string name="rl_no_messages_for_bot">у бота ещё нет сообщений, отправьте ему /start и попробуйте снова</string>
+
+    <string name="rl_watch">Отправлять сводку после сохранения записи</string>
+    <string name="rl_watch_hint">Сообщает о каждом треке, который запись поездки сохраняет в tracks/rec, когда вы нажимаете «Завершить». При паузе ничего не отправляется. Сообщается только о треках, завершённых после того, как вы впервые включили эту функцию.</string>
+    <string name="rl_check_now">Проверить сейчас</string>
+    <string name="rl_resend_latest">Отправить снова</string>
+
+    <string name="rl_summary_title">Поездка записана</string>
+    <string name="rl_summary_no_stats">У OsmAnd пока нет статистики по этому треку.</string>
+    <string name="rl_summary_distance">Расстояние</string>
+    <string name="rl_summary_duration">Время</string>
+    <string name="rl_summary_avg_speed">Средняя скорость</string>
+    <string name="rl_summary_elevation">Высота</string>
+    <string name="rl_summary_moving">в движении %1$s</string>
+    <string name="rl_summary_max">макс. %1$s</string>
+    <plurals name="rl_summary_points">
+        <item quantity="one">%1$d точка</item>
+        <item quantity="few">%1$d точки</item>
+        <item quantity="many">%1$d точек</item>
+        <item quantity="other">%1$d точки</item>
+    </plurals>
+    <plurals name="rl_summary_tracks">
+        <item quantity="one">%1$d трек</item>
+        <item quantity="few">%1$d трека</item>
+        <item quantity="many">%1$d треков</item>
+        <item quantity="other">%1$d трека</item>
+    </plurals>
+    <plurals name="rl_summary_waypoints">
+        <item quantity="one">%1$d путевая точка</item>
+        <item quantity="few">%1$d путевые точки</item>
+        <item quantity="many">%1$d путевых точек</item>
+        <item quantity="other">%1$d путевой точки</item>
+    </plurals>
+    <string name="rl_unit_m">%1$d м</string>
+    <string name="rl_unit_km">%1$.2f км</string>
+    <string name="rl_unit_kmh">%1$.1f км/ч</string>
+</resources>

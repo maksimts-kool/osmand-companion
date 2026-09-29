@@ -19,4 +19,29 @@
     <string name="rl_watch_hint">Reports each track trip recording saves to tracks/rec when you tap Finish. Pausing sends nothing. Only tracks that end after you first turn this on are reported.</string>
     <string name="rl_check_now">Check now</string>
     <string name="rl_resend_latest">Resend latest</string>
+
+    <!-- The Telegram message for a recorded trip. Emoji and bold are added in TrackSummary. -->
+    <string name="rl_summary_title">Trip recorded</string>
+    <string name="rl_summary_no_stats">OsmAnd has no statistics for this track yet.</string>
+    <string name="rl_summary_distance">Distance</string>
+    <string name="rl_summary_duration">Duration</string>
+    <string name="rl_summary_avg_speed">Avg speed</string>
+    <string name="rl_summary_elevation">Elevation</string>
+    <string name="rl_summary_moving">moving %1$s</string>
+    <string name="rl_summary_max">max %1$s</string>
+    <plurals name="rl_summary_points">
+        <item quantity="one">%1$d point</item>
+        <item quantity="other">%1$d points</item>
+    </plurals>
+    <plurals name="rl_summary_tracks">
+        <item quantity="one">%1$d track</item>
+        <item quantity="other">%1$d tracks</item>
+    </plurals>
+    <plurals name="rl_summary_waypoints">
+        <item quantity="one">%1$d waypoint</item>
+        <item quantity="other">%1$d waypoints</item>
+    </plurals>
+    <string name="rl_unit_m">%1$d m</string>
+    <string name="rl_unit_km">%1$.2f km</string>
+    <string name="rl_unit_kmh">%1$.1f km/h</string>
 </resources>

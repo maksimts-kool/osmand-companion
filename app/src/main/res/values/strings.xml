@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">OsmAnd Companion</string>
+    <string name="app_name" translatable="false">OsmAnd Companion</string>
     <string name="status_connected">Connected to %1$s</string>
     <string name="status_no_access">Access is off in %1$s</string>
     <string name="status_no_access_hint">In OsmAnd open Menu → Plugins and tap “OsmAnd Companion” to enable it.</string>

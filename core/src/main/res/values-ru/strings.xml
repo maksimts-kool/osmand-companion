@@ -1,0 +1,4 @@
+<resources>
+    <string name="core_notification_channel">Фоновые функции</string>
+    <string name="core_notification_title">Подключено к OsmAnd</string>
+</resources>

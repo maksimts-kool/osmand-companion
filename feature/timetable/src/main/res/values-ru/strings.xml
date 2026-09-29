@@ -1,0 +1,70 @@
+<resources>
+    <string name="tt_feature_title">Расписания транспорта</string>
+    <string name="tt_intro">Расписания всех автобусных, трамвайных, железнодорожных и паромных остановок Эстонии с peatus.ee прямо на карте OsmAnd.</string>
+    <string name="tt_show_in_osmand_switch">Показывать расписания в OsmAnd</string>
+    <string name="tt_where_hint">• Карта: остановки появляются вокруг центра карты, когда он в Эстонии (точки с масштаба 13, значки с 15). Нажмите на остановку, чтобы увидеть ближайшие отправления. В «Настройке карты» их скрывает пункт с названием приложения.\n• В меню остановки: «Ближайшие отправления» обновляет их, «Весь день» открывает оставшуюся часть дня по маршрутам поверх карты, «Показать в Companion» открывает остановку здесь.\n• «Настройка экрана» → виджеты: «Следующее отправление» для последней открытой остановки. Нажмите на него, чтобы открыть полное расписание.\n• Главное меню: «Расписания транспорта» открывает поиск ниже.</string>
+    <string name="tt_overlay_hint">Android позволяет кнопкам OsmAnd «Весь день» и «Показать в Companion» открываться прямо поверх OsmAnd, только если этому приложению разрешён показ поверх других приложений. А пока они приходят уведомлением, на которое нужно нажать.</string>
+    <string name="tt_overlay_allow">Разрешить</string>
+    <string name="tt_search_hint">Найти остановку</string>
+    <string name="tt_near_map">Рядом с центром карты OsmAnd</string>
+    <string name="tt_near_map_empty">Откройте карту OsmAnd где-нибудь в Эстонии, чтобы увидеть остановки рядом, или найдите остановку по названию.</string>
+    <string name="tt_search_results">Остановки «%1$s»</string>
+    <string name="tt_search_empty">В Эстонии нет остановок по запросу «%1$s».</string>
+    <string name="tt_distance_m">%1$d м</string>
+
+    <string name="tt_layer_name">Расписания транспорта (peatus.ee)</string>
+    <string name="tt_drawer_item">Расписания транспорта</string>
+    <string name="tt_widget_title">Следующее отправление (peatus.ee)</string>
+    <string name="tt_widget_none">сегодня нет</string>
+    <string name="tt_button_departures">Ближайшие отправления</string>
+    <string name="tt_button_full_day">Весь день</string>
+    <string name="tt_button_show_in_app">Показать в Companion</string>
+    <string name="tt_open_channel">Остановки, открытые из OsmAnd</string>
+    <string name="tt_open_tap">Нажмите, чтобы открыть расписание</string>
+    <string name="tt_stop_type">Остановка · %1$s</string>
+    <string name="tt_stop_towards">%1$s · направление: %2$s</string>
+    <string name="tt_no_departures">Нет отправлений в ближайшие 24 часа</string>
+    <string name="tt_no_departures_day">В этот день отсюда ничего не отправляется</string>
+    <string name="tt_no_more_today">Сегодня отправлений больше нет</string>
+    <string name="tt_sheet_subtitle">До конца дня · обновлено %1$s</string>
+    <string name="tt_rest_of_today">До конца дня</string>
+    <string name="tt_refresh">Обновить</string>
+    <string name="tt_full_timetable">Полное расписание</string>
+    <string name="tt_close">Закрыть</string>
+    <string name="tt_updated">Обновлено %1$s · peatus.ee</string>
+    <string name="tt_load_failed">Не удалось загрузить с peatus.ee: %1$s</string>
+
+    <string name="tt_mode_bus">Автобус</string>
+    <string name="tt_mode_trolleybus">Троллейбус</string>
+    <string name="tt_mode_regional">Междугородный автобус</string>
+    <string name="tt_mode_tram">Трамвай</string>
+    <string name="tt_mode_train">Поезд</string>
+    <string name="tt_mode_ferry">Паром</string>
+    <string name="tt_mode_other">Транспорт</string>
+    <string name="tt_now">сейчас</string>
+    <string name="tt_in_min">%1$d мин</string>
+    <string name="tt_in_h_min">%1$d ч %2$d мин</string>
+    <string name="tt_live">онлайн</string>
+
+    <string name="tt_today">Сегодня</string>
+    <string name="tt_tomorrow">Завтра</string>
+    <string name="tt_next_departures">Ближайшие отправления</string>
+    <string name="tt_timetable_for">Расписание · %1$s</string>
+    <string name="tt_towards">→ %1$s</string>
+    <string name="tt_next_in">через %1$s</string>
+    <string name="tt_show_in_osmand">Показать в OsmAnd</string>
+    <string name="tt_osmand_missing">OsmAnd не установлен</string>
+    <string name="tt_stop_unknown">peatus.ee не знает эту остановку</string>
+    <string name="tt_trip_unknown">peatus.ee не знает этот рейс</string>
+    <string name="tt_retry">Повторить</string>
+    <string name="tt_back">Назад</string>
+    <string name="tt_your_stop">Ваша остановка</string>
+    <string name="tt_late">опаздывает на %1$d мин</string>
+    <string name="tt_early">раньше на %1$d мин</string>
+    <plurals name="tt_stops">
+        <item quantity="one">%1$d остановка</item>
+        <item quantity="few">%1$d остановки</item>
+        <item quantity="many">%1$d остановок</item>
+        <item quantity="other">%1$d остановки</item>
+    </plurals>
+</resources>

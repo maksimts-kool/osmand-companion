@@ -30,8 +30,8 @@ object Estonia {
         timeInMillis
     }
 
-    fun format(pattern: String, time: Long): String =
-        SimpleDateFormat(pattern, Locale.getDefault()).apply { timeZone = this@Estonia.timeZone }.format(Date(time))
+    fun format(pattern: String, time: Long, locale: Locale = Locale.getDefault()): String =
+        SimpleDateFormat(pattern, locale).apply { timeZone = this@Estonia.timeZone }.format(Date(time))
 }
 
 /** Distance in meters; plenty accurate for "has the map moved a few hundred meters". */
@@ -81,16 +81,16 @@ object TransitFormat {
     }
 
     /** "20:14", or "Tue 06:15" when it's not today. */
-    fun clockWithDay(time: Long, now: Long): String =
+    fun clockWithDay(time: Long, now: Long, locale: Locale = Locale.getDefault()): String =
         if (Estonia.format("yyyyMMdd", time) == Estonia.format("yyyyMMdd", now)) clock(time)
-        else Estonia.format("EEE HH:mm", time)
+        else Estonia.format("EEE HH:mm", time, locale)
 
     /** A time from a timetable: seconds since the service day started, which can pass 24:00. */
     fun serviceTime(serviceDay: Long, seconds: Int): Long = (serviceDay + seconds) * 1000
 
     /** One departure on one line: "20:14  5 → Metsakooli · 3 min · live". */
     fun departureLine(context: Context, departure: Departure, now: Long): String = buildString {
-        append(clockWithDay(departure.time, now))
+        append(clockWithDay(departure.time, now, context.resources.configuration.locales[0]))
         append("  ").append(departure.route)
         if (departure.headsign.isNotEmpty()) append(" → ").append(departure.headsign)
         relative(context, departure.time, now)?.let { append(" · ").append(it) }

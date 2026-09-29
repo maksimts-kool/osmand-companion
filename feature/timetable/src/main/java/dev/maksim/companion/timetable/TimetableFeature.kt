@@ -103,11 +103,17 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     private fun update() {
         val api = osmand.api
         if (api == null || !osmand.hasAccess) return
+        if (registeredWith === api && ui.languageChanged()) {
+            // OsmAnd keeps the names it was given; add everything again in its new language.
+            ui.unregister()
+            registeredWith = null
+            fetchedAt = 0L
+        }
         if (registeredWith !== api) {
             if (!ui.register()) return
             registeredWith = api
             nearbyStops = emptyList()
-            AppLog.log("Timetables: added stop layer, menu buttons and widget to OsmAnd")
+            AppLog.log("Timetables: added stop layer, menu buttons and widget to OsmAnd (${ui.locales.toLanguageTags()})")
         }
         val info = osmand.call("getAppInfo") { it.appInfo } ?: return
         // Nobody is looking: don't spend data or peatus.ee's capacity.
@@ -187,7 +193,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 }
             } catch (e: IOException) {
                 val stop = nearbyStops.find { it.id == stopId } ?: return@post
-                ui.showInMenu(stop, listOf(context.getString(R.string.tt_load_failed, e.message)))
+                ui.showInMenu(stop, listOf(ui.strings.getString(R.string.tt_load_failed, e.message)))
             }
             nearbyStops.find { it.id == stopId }?.let { ui.updateWidget(it, now) }
         }
@@ -204,6 +210,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     /** Opens the rest of today at the stop in a sheet over OsmAnd's map, dark when OsmAnd is. */
     private fun showFullDay(stopId: String, now: Long) {
         val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
+        DaySheetActivity.locales = ui.locales
         open(DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now)), stop.name) {
             DaySheetActivity.resumedStopId == stopId
         }

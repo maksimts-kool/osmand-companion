@@ -1,5 +1,6 @@
 package dev.maksim.companion.routelogger
 
+import android.content.Context
 import net.osmand.aidlapi.gpx.AGpxFile
 import net.osmand.aidlapi.gpx.AGpxFileDetails
 import java.text.SimpleDateFormat
@@ -14,49 +15,64 @@ import java.util.Locale
  */
 object TrackSummary {
 
-    fun format(track: AGpxFile): String {
+    fun format(context: Context, track: AGpxFile): String {
         val path = track.relativePath ?: track.fileName
         val d = track.details
-        val lines = mutableListOf("🏁 <b>Trip recorded</b>")
+        val lines = mutableListOf("🏁 <b>${escape(context.getString(R.string.rl_summary_title))}</b>")
         if (d == null) {
-            lines += "OsmAnd has no statistics for this track yet."
+            lines += escape(context.getString(R.string.rl_summary_no_stats))
         } else {
-            lines += details(d)
+            lines += Details(context).lines(d)
         }
         lines += "📁 <code>${escape(path)}</code>"
         return lines.joinToString("\n")
     }
 
-    private fun details(d: AGpxFileDetails): List<String> = buildList {
-        if (d.startTime > 0 && d.endTime > 0) add("📅 ${timeRange(d.startTime, d.endTime)}")
+    /** The statistics lines, in [context]'s language. */
+    private class Details(private val context: Context) {
 
-        add("📏 Distance: <b>${km(d.totalDistance)}</b>")
+        fun lines(d: AGpxFileDetails): List<String> = buildList {
+            if (d.startTime > 0 && d.endTime > 0) add("📅 ${timeRange(d.startTime, d.endTime)}")
 
-        val duration = StringBuilder("⏱ Duration: <b>${duration(d.timeSpan)}</b>")
-        if (d.timeMoving in 1 until d.timeSpan) duration.append(" (moving ${duration(d.timeMoving)})")
-        add(duration.toString())
+            add("📏 ${label(R.string.rl_summary_distance)}: <b>${km(d.totalDistance)}</b>")
 
-        if (d.timeSpan > 0) {
-            val speed = StringBuilder("🚀 Avg speed: <b>${kmh(d.avgSpeed)}</b>")
-            if (d.timeMoving > 0 && d.totalDistanceMoving > 0) {
-                speed.append(" (moving ${kmh(d.totalDistanceMoving / (d.timeMoving / 1000f))})")
+            val duration = StringBuilder("⏱ ${label(R.string.rl_summary_duration)}: <b>${duration(d.timeSpan)}</b>")
+            if (d.timeMoving in 1 until d.timeSpan) duration.append(" (${label(R.string.rl_summary_moving, duration(d.timeMoving))})")
+            add(duration.toString())
+
+            if (d.timeSpan > 0) {
+                val speed = StringBuilder("🚀 ${label(R.string.rl_summary_avg_speed)}: <b>${kmh(d.avgSpeed)}</b>")
+                if (d.timeMoving > 0 && d.totalDistanceMoving > 0) {
+                    speed.append(" (${label(R.string.rl_summary_moving, kmh(d.totalDistanceMoving / (d.timeMoving / 1000f)))})")
+                }
+                if (d.maxSpeed > 0) speed.append(", ${label(R.string.rl_summary_max, kmh(d.maxSpeed))}")
+                add(speed.toString())
             }
-            if (d.maxSpeed > 0) speed.append(", max ${kmh(d.maxSpeed)}")
-            add(speed.toString())
+
+            // OsmAnd leaves min at 99999 / max at -100 when the track has no elevation.
+            if (d.minElevation < 99_999 && d.maxElevation >= d.minElevation) {
+                add(
+                    "⛰ ${label(R.string.rl_summary_elevation)}: ↑ ${m(d.diffElevationUp)} ↓ ${m(d.diffElevationDown)} " +
+                        "(${m(d.minElevation)} – ${m(d.maxElevation)})",
+                )
+            }
+
+            val points = StringBuilder("📍 ${count(R.plurals.rl_summary_points, d.points)}")
+            if (d.totalTracks > 1) points.append(", ${count(R.plurals.rl_summary_tracks, d.totalTracks)}")
+            if (d.wptPoints > 0) points.append(", ${count(R.plurals.rl_summary_waypoints, d.wptPoints)}")
+            add(points.toString())
         }
 
-        // OsmAnd leaves min at 99999 / max at -100 when the track has no elevation.
-        if (d.minElevation < 99_999 && d.maxElevation >= d.minElevation) {
-            add(
-                "⛰ Elevation: ↑ ${m(d.diffElevationUp)} ↓ ${m(d.diffElevationDown)} " +
-                    "(${m(d.minElevation)} – ${m(d.maxElevation)})",
-            )
-        }
+        private fun label(id: Int, vararg args: Any) = escape(context.getString(id, *args))
 
-        val points = StringBuilder("📍 ${d.points} points")
-        if (d.totalTracks > 1) points.append(", ${d.totalTracks} tracks")
-        if (d.wptPoints > 0) points.append(", ${d.wptPoints} waypoints")
-        add(points.toString())
+        private fun count(id: Int, n: Int) = escape(context.resources.getQuantityString(id, n, n))
+
+        private fun km(meters: Float) =
+            if (meters < 1000) m(meters.toDouble()) else label(R.string.rl_unit_km, meters / 1000)
+
+        private fun kmh(metersPerSecond: Float) = label(R.string.rl_unit_kmh, metersPerSecond * 3.6f)
+
+        private fun m(meters: Double) = label(R.string.rl_unit_m, Math.round(meters).toInt())
     }
 
     private fun timeRange(start: Long, end: Long): String {
@@ -70,13 +86,6 @@ object TrackSummary {
             "$startDay ${time.format(Date(start))} – $endDay ${time.format(Date(end))}"
         }
     }
-
-    private fun km(meters: Float) =
-        if (meters < 1000) "${meters.toInt()} m" else String.format(Locale.US, "%.2f km", meters / 1000)
-
-    private fun kmh(metersPerSecond: Float) = String.format(Locale.US, "%.1f km/h", metersPerSecond * 3.6f)
-
-    private fun m(meters: Double) = "${Math.round(meters)} m"
 
     private fun duration(ms: Long): String {
         val totalSeconds = ms / 1000

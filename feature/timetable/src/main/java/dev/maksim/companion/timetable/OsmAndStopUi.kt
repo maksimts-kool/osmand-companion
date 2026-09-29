@@ -2,7 +2,10 @@ package dev.maksim.companion.timetable
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
+import android.content.res.Resources
 import android.net.Uri
+import android.os.LocaleList
 import android.view.KeyEvent
 import dev.maksim.companion.core.OsmAndConnection
 import net.osmand.aidlapi.IOsmAndAidlCallback
@@ -30,6 +33,7 @@ import net.osmand.aidlapi.navdrawer.SetNavDrawerItemsParams
 import net.osmand.aidlapi.navigation.ADirectionInfo
 import net.osmand.aidlapi.navigation.OnVoiceNavigationParams
 import net.osmand.aidlapi.search.SearchResult
+import java.util.Locale
 
 /**
  * What the timetable feature adds to OsmAnd's own screens. Apps can't extend OsmAnd's built-in transport
@@ -44,8 +48,10 @@ import net.osmand.aidlapi.search.SearchResult
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
  *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
  *
- * OsmAnd keeps layers, widgets and buttons only in memory, so [register] runs again after every reconnect.
- * Call everything from the feature's worker thread.
+ * All of it is in OsmAnd's language ([strings]), which can differ from this app's.
+ *
+ * OsmAnd keeps layers, widgets and buttons only in memory, so [register] runs again after every reconnect, and
+ * when OsmAnd's language changes ([languageChanged]). Call everything from the feature's worker thread.
  */
 class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConnection) {
 
@@ -57,6 +63,14 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     private val shown = HashMap<String, AMapPoint>()
     private var widgetText: String? = null
     private var widgetStopId: String? = null
+
+    /** OsmAnd's language as of [register]. */
+    var locales: LocaleList = LocaleList.getDefault()
+        private set
+
+    /** For text shown in OsmAnd: this app's strings in OsmAnd's language. */
+    var strings: Context = context
+        private set
 
     private val callback = object : IOsmAndAidlCallback.Stub() {
         override fun onContextMenuButtonClicked(buttonId: Int, pointId: String?, layerId: String?) {
@@ -79,6 +93,10 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         buttonCallbackIds.clear()
         widgetText = null
         widgetStopId = null
+        osmandLocales()?.let {
+            locales = it
+            strings = localized(context, it)
+        }
         val added = osmand.call("addMapLayer") { it.addMapLayer(AddMapLayerParams(layer(emptyList()))) } == true
         if (!added) return false
         for (row in buttonRows()) {
@@ -88,7 +106,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         osmand.call("addMapWidget") { it.addMapWidget(AddMapWidgetParams(widget(NO_VALUE, null))) }
         // NEW_TASK: without it, Android 15+ won't bring this app's task to the front from OsmAnd's.
         val item = NavDrawerItem(
-            context.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK,
+            strings.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK,
         )
         osmand.call("setNavDrawerItems") {
             it.setNavDrawerItems(SetNavDrawerItemsParams(osmand.appPackage, listOf(item)))
@@ -150,9 +168,24 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
     fun departureDetails(stop: Stop, now: Long): List<String> = buildList {
         val upcoming = stop.departures.filter { it.time >= now - GRACE_MS }
-        if (upcoming.isEmpty()) add(context.getString(R.string.tt_no_departures))
-        upcoming.forEach { add(TransitFormat.departureLine(context, it, now)) }
-        add(context.getString(R.string.tt_updated, TransitFormat.clock(now)))
+        if (upcoming.isEmpty()) add(strings.getString(R.string.tt_no_departures))
+        upcoming.forEach { add(TransitFormat.departureLine(strings, it, now)) }
+        add(strings.getString(R.string.tt_updated, TransitFormat.clock(now)))
+    }
+
+    /** Whether OsmAnd's language is no longer the one everything was registered in. */
+    fun languageChanged(): Boolean = osmandLocales()?.let { it != locales } == true
+
+    /**
+     * The language OsmAnd shows itself in: the one picked in its settings, else the phone's (not this app's, which
+     * can be set apart in Android's settings). Null if OsmAnd can't be asked.
+     */
+    private fun osmandLocales(): LocaleList? {
+        // Like "ru", "pt_BR" or "b+sr+Latn"; empty when it follows the phone.
+        val preferred = preference(PREF_LOCALE) ?: return null
+        if (preferred.isEmpty()) return Resources.getSystem().configuration.locales
+        val tag = preferred.removePrefix("b+").replace('+', '-').replace('_', '-')
+        return LocaleList(Locale.forLanguageTag(tag))
     }
 
     /**
@@ -182,8 +215,9 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         val next = stop?.departures?.firstOrNull { it.time >= now - GRACE_MS }
         val text = when {
             stop == null -> NO_VALUE
-            next == null -> context.getString(R.string.tt_widget_none)
-            else -> "${next.route} · " + (TransitFormat.relative(context, next.time, now) ?: TransitFormat.clockWithDay(next.time, now))
+            next == null -> strings.getString(R.string.tt_widget_none)
+            else -> "${next.route} · " +
+                (TransitFormat.relative(strings, next.time, now) ?: TransitFormat.clockWithDay(next.time, now, locales[0]))
         }
         if (text == widgetText && stop?.id == widgetStopId) return
         osmand.call("updateMapWidget") { it.updateMapWidget(UpdateMapWidgetParams(widget(text, stop))) }
@@ -198,13 +232,13 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
             AMapPoint.POINT_TYPE_ICON_NAME_PARAM to mode.osmandIcon,
         )
         return AMapPoint(
-            stop.id, "", stop.name, TransitFormat.stopType(context, stop), LAYER_ID, mode.color,
+            stop.id, "", stop.name, TransitFormat.stopType(strings, stop), LAYER_ID, mode.color,
             ALatLon(stop.lat, stop.lon), details, params,
         )
     }
 
     private fun layer(points: List<AMapPoint>) =
-        AMapLayer(LAYER_ID, context.getString(R.string.tt_layer_name), Z_ORDER, points).apply {
+        AMapLayer(LAYER_ID, strings.getString(R.string.tt_layer_name), Z_ORDER, points).apply {
             isImagePoints = true
             setCirclePointZoomBounds(13, 14)
             setSmallPointZoomBounds(15, MAX_ZOOM)
@@ -218,7 +252,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
      */
     private fun buttonRows(): List<ContextMenuButtonsParams> {
         fun row(id: Int, caption: Int, icon: String) = ContextMenuButtonsParams(
-            AContextMenuButton(id, context.getString(caption), "", icon, "", true, true), null,
+            AContextMenuButton(id, strings.getString(caption), "", icon, "", true, true), null,
             "${BUTTONS_ID}_$id", osmand.appPackage, LAYER_ID, 0L,
             // OsmAnd shows the buttons on a point whose id is listed here OR that is in our layer. An empty list
             // would put them on every app's points, so list something that only matches the layer rule.
@@ -237,7 +271,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val icon = Mode.BUS.osmandIcon
         return AMapWidget(
-            WIDGET_ID, icon, context.getString(R.string.tt_widget_title), icon, icon, text, "", WIDGET_ORDER, onClick,
+            WIDGET_ID, icon, strings.getString(R.string.tt_widget_title), icon, icon, text, "", WIDGET_ORDER, onClick,
         )
     }
 
@@ -252,6 +286,10 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         fun deepLink(context: Context): Intent =
             Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK)).setPackage(context.packageName)
 
+        /** [context] with its strings and dates in [locales]. */
+        fun localized(context: Context, locales: LocaleList): Context =
+            context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocales(locales) })
+
         private const val LAYER_ID = "transit_stops"
         private const val BUTTONS_ID = "transit_stop_buttons"
         private const val WIDGET_ID = "transit_next_departure"
@@ -261,6 +299,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         private const val POINTS_PER_CALL = 40
         private const val PREF_DAY_NIGHT = "daynight_mode"
         private const val PREF_APP_THEME = "osmand_theme"
+        private const val PREF_LOCALE = "preferred_locale"
         private const val NO_VALUE = "—"
 
         /** A departure a few seconds past is probably still at the stop. */

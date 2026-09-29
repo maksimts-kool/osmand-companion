@@ -69,6 +69,12 @@ android {
         buildConfig = true
         viewBinding = true
     }
+
+    // Lists the translations (values-ru, …) so Android 13+ offers them under Settings → Apps → Language.
+    // res/resources.properties says which language the untranslated values/ strings are in.
+    androidResources {
+        generateLocaleConfig = true
+    }
 }
 
 dependencies {

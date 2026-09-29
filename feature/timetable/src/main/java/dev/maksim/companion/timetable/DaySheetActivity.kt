@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.LocaleList
 import android.view.View
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -25,7 +26,7 @@ import java.util.concurrent.Executors
 
 /**
  * The Full day button in a stop's OsmAnd menu opens this over OsmAnd's map: the rest of today by route, in
- * OsmAnd's colors and day or night look, so it reads as part of OsmAnd. (OsmAnd's API can only put text rows in
+ * OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd. (OsmAnd's API can only put text rows in
  * its own menu.) It runs in a task of its own, so closing it goes straight back to OsmAnd rather than to this app.
  * Tapping a time opens that trip, and Full timetable the stop's timetable, in its place ([leaveFor]).
  */
@@ -41,6 +42,10 @@ class DaySheetActivity : AppCompatActivity() {
 
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(locales?.let { OsmAndStopUi.localized(newBase, it) } ?: newBase)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before the views are made, so the colors come from values-night when OsmAnd is dark. The manifest says
@@ -212,6 +217,13 @@ class DaySheetActivity : AppCompatActivity() {
         @Volatile
         var resumedStopId: String? = null
             private set
+
+        /**
+         * OsmAnd's language, for the sheets opened from now on; null is this app's. Not an intent extra: the
+         * language has to be set in [attachBaseContext], before the intent is there.
+         */
+        @Volatile
+        var locales: LocaleList? = null
 
         /**
          * Opens the sheet for [stop] in a fresh task of its own, over whatever is in front (OsmAnd). [night] is

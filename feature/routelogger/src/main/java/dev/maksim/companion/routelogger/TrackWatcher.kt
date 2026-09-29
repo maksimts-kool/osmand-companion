@@ -65,7 +65,7 @@ class TrackWatcher(private val context: Context, private val osmand: OsmAndConne
             AppLog.log("Telegram isn't set up, not sending ${pathOf(track)}")
             return
         }
-        TelegramWorker.enqueue(context, TrackSummary.format(track), pathOf(track))
+        TelegramWorker.enqueue(context, TrackSummary.format(context, track), pathOf(track))
     }
 
     /** Tracks saved by trip recording, or null if OsmAnd can't be asked right now. */
