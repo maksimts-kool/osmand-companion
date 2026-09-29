@@ -11,7 +11,7 @@ import androidx.core.content.ContextCompat
  * keeps this process, and with it the OsmAnd connection, alive.
  */
 interface BackgroundFeature {
-    /** Short name for the service's notification, e.g. "Trip summaries". */
+    /** Short name for the service's notification, e.g. "Transit timetables". */
     val title: String
 
     /** Whether the user has this feature on. Survives reboots: [BootReceiver] restarts the service. */

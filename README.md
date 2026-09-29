@@ -1,12 +1,12 @@
 # OsmAnd Companion
 
-An Android companion app for [OsmAnd](https://osmand.net) with two features:
+An Android companion app for [OsmAnd](https://osmand.net):
 
-- **Trip summaries**: when you **finish** a trip recording, a summary goes to your Telegram chat.
 - **Transit timetables (Estonia)**: OsmAnd shows public transport stops and routes but no timetables.
   This adds them right on OsmAnd's map, from [peatus.ee](https://peatus.ee).
 
-Both run on one connection to OsmAnd and one quiet background notification, which shows while either is on.
+It keeps one connection to OsmAnd and one quiet background notification, which shows while a feature is on.
+Trip summaries to Telegram live on the `feature/trips` branch for now.
 
 ## Setup
 
@@ -14,43 +14,7 @@ Both run on one connection to OsmAnd and one quiet background notification, whic
    (or build it, see below), open **OsmAnd Companion**, tap *Connect*.
 2. In OsmAnd open *Menu → Plugins* and tap **OsmAnd Companion — Third-party app** so it turns orange.
    OsmAnd blocks third-party apps until you do this.
-3. Turn on the features you want in the *Trips* and *Timetables* tabs.
-
-## Trip summaries
-
-```
-🏁 Trip recorded
-📅 Mon 28 Sep 2026, 17:02 – 18:15
-📏 Distance: 12.34 km
-⏱ Duration: 1:13:05 (moving 58:40)
-🚀 Avg speed: 10.1 km/h (moving 12.6 km/h), max 31.2 km/h
-⛰ Elevation: ↑ 123 m ↓ 118 m (12 m – 87 m)
-📍 1234 points, 3 waypoints
-📁 rec/2026-09-28_17-02_Mon.gpx
-```
-
-Pausing sends nothing. The statistics are the ones OsmAnd calculates for the saved track.
-
-1. In Telegram, create a bot with [@BotFather](https://t.me/BotFather) and paste its token into the *Trips* tab.
-2. Send `/start` to your bot, then tap *Detect* to fill in your chat id. *Send test* checks both.
-3. Turn on **Send a summary when a recording is saved**.
-
-### How it works
-
-The API has no "recording finished" event, and the recording state isn't readable through it. What *is*
-readable is the list of saved tracks with their statistics (`getImportedGpx`). When a recording is finished,
-OsmAnd writes it to `tracks/rec/` (or `tracks/rec/yyyy-MM/`), so the feature:
-
-- checks that list every 30 s, and right away whenever OsmAnd (re)connects;
-- reports each track under `rec/` that ended after you first turned it on and hasn't been reported yet
-  (`TrackWatcher`). Tracks are recognized by start/end time and point count, so renaming the file in the
-  dialog OsmAnd shows after *Finish* doesn't report it twice;
-- sends the message through WorkManager (`TelegramWorker`), so a trip that ends without signal is delivered once
-  the network is back.
-
-Limitation: Trip recording → *Options → Save* ("save and keep recording") writes the same kind of file to
-`tracks/rec/` as *Finish*, and OsmAnd doesn't tell apps whether recording continued, so that is reported too.
-Use *Finish* to end a trip.
+3. Turn on the features you want in the *Timetables* tab.
 
 ## Transit timetables (Estonia)
 
@@ -148,7 +112,6 @@ CI gets the same key from the repository secrets `SIGNING_KEYSTORE_BASE64` (the 
 app/                      shell: home screen with a tab per feature, OsmAnd status, log;
                           update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
 core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog
-feature/routelogger/      RouteLoggerFeature, TrackWatcher, TrackSummary, Telegram, RouteLoggerFragment
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient,
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider
 ```
@@ -176,8 +139,6 @@ adb emu geo fix 24.7453 59.4372          # fake GPS at Tallinn Old Town (lon lat
 adb logcat -s Companion                  # this app's log
 adb logcat | grep OsmandAidlService      # OsmAnd's side: shows "enabled: true/false" per call
 ```
-
-*Resend latest* in the *Trips* tab sends the newest recorded track again, handy for checking the message.
 
 ## Stack
 

@@ -4,7 +4,6 @@ import android.app.Application
 import dev.maksim.companion.core.BackgroundFeature
 import dev.maksim.companion.core.CompanionHost
 import dev.maksim.companion.core.OsmAndConnection
-import dev.maksim.companion.routelogger.RouteLoggerFeature
 import dev.maksim.companion.timetable.TimetableFeature
 import dev.maksim.companion.update.Updater
 
@@ -20,7 +19,6 @@ class CompanionApp : Application(), CompanionHost {
         super.onCreate()
         osmand = OsmAndConnection(this)
         features = listOf(
-            RouteLoggerFeature(this, osmand),
             TimetableFeature(this, osmand),
         )
         osmand.connect()

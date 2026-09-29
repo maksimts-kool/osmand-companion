@@ -6,7 +6,7 @@
     <!-- Updates from GitHub Releases (Updater); the user allows it once, on the first update. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- allowBackup off: the prefs hold the Telegram bot token. -->
+    <!-- allowBackup off: the prefs may hold the Telegram bot token from the trip summaries feature. -->
     <application
         android:name=".CompanionApp"
         android:allowBackup="false"

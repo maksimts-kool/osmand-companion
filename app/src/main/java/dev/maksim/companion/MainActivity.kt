@@ -21,7 +21,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.maksim.companion.core.CompanionService
 import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.databinding.ActivityMainBinding
-import dev.maksim.companion.routelogger.RouteLoggerFragment
 import dev.maksim.companion.timetable.OsmAndStopUi
 import dev.maksim.companion.timetable.TimetableFragment
 import dev.maksim.companion.update.Release
@@ -64,7 +63,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             }
         }
         if (savedInstanceState == null) {
-            binding.tabs.selectedItemId = if (isTimetableLink(intent)) R.id.tab_timetables else R.id.tab_trips
+            binding.tabs.selectedItemId = R.id.tab_timetables
             updateRequested = isUpdateLink(intent)
             Updater.checkIfStale()
         }
@@ -187,9 +186,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     }
 
     private fun newTab(id: Int): Fragment = when (id) {
-        R.id.tab_timetables -> TimetableFragment()
         R.id.tab_log -> LogFragment()
-        else -> RouteLoggerFragment()
+        else -> TimetableFragment()
     }
 
     private fun isTimetableLink(intent: Intent?) = intent?.data?.toString() == OsmAndStopUi.DEEP_LINK

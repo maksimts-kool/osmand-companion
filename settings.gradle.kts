@@ -28,5 +28,4 @@ rootProject.name = "osmand-companion"
 // :app is the shell (home screen, OsmAnd status, log); each feature is its own module on top of :core.
 include(":app")
 include(":core")
-include(":feature:routelogger")
 include(":feature:timetable")

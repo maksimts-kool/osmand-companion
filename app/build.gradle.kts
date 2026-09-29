@@ -79,7 +79,6 @@ android {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":feature:routelogger"))
     implementation(project(":feature:timetable"))
     // The daily update check.
     implementation("androidx.work:work-runtime:2.12.0")
