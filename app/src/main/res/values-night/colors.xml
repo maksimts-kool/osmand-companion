@@ -1,0 +1,18 @@
+<resources>
+    <!-- OsmAnd's night colors: dark greys, and orange instead of blue for what's active, as in OsmAnd. -->
+    <color name="osm_list_bg">#1E1F20</color>              <!-- list_background_color_dark -->
+    <color name="osm_card_bg">#222526</color>              <!-- card_and_list_background_dark -->
+    <color name="osm_app_bar">#252727</color>              <!-- app_bar_secondary_dark -->
+    <color name="osm_activity_bg">#0D0D0D</color>          <!-- activity_background_color_dark -->
+    <color name="osm_inactive_bg">#303436</color>          <!-- inactive_buttons_and_links_bg_dark -->
+    <color name="osm_buttons_bg">#222526</color>           <!-- ctx_menu_buttons_bg_dark -->
+    <color name="osm_text">#E6E6E6</color>                 <!-- text_color_primary_dark -->
+    <color name="osm_text_secondary">#8C8C8C</color>       <!-- text_color_secondary_dark -->
+    <color name="osm_icon">#727272</color>                 <!-- icon_color_default_dark -->
+    <color name="osm_divider">#2C3033</color>              <!-- divider_color_dark -->
+    <color name="osm_active">#D28521</color>               <!-- active_color_primary_dark -->
+    <color name="osm_active_pressed">#B87114</color>       <!-- active_buttons_and_links_bg_pressed_dark -->
+    <color name="osm_on_active">#EBEBEB</color>            <!-- active_buttons_and_links_text_dark -->
+    <color name="osm_active_tint">#1AD28521</color>        <!-- switch_button_active_dark -->
+    <color name="osm_orange">#D28521</color>               <!-- icon_color_osmand_dark -->
+</resources>

@@ -1,0 +1,5 @@
+<resources>
+    <!-- The home screen's tabs (MainActivity.TAB_IDS); not on the TabItems, which view binding can't bind. -->
+    <item name="tab_timetables" type="id" />
+    <item name="tab_log" type="id" />
+</resources>

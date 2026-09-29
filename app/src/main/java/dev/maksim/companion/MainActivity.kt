@@ -18,6 +18,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.tabs.TabLayout
 import dev.maksim.companion.core.CompanionService
 import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.databinding.ActivityMainBinding
@@ -57,15 +58,19 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             }
             openOsmandButton.setOnClickListener { openOsmand() }
             updateButton.setOnClickListener { Updater.available?.let { showUpdateDialog(it) } }
-            tabs.setOnItemSelectedListener {
-                showTab(it.itemId)
-                true
-            }
+            tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab) = showTab(TAB_IDS[tab.position])
+                override fun onTabUnselected(tab: TabLayout.Tab) {}
+                override fun onTabReselected(tab: TabLayout.Tab) {}
+            })
         }
         if (savedInstanceState == null) {
-            binding.tabs.selectedItemId = R.id.tab_timetables
+            showTab(R.id.tab_timetables)
             updateRequested = isUpdateLink(intent)
             Updater.checkIfStale()
+        } else {
+            // The tab bar doesn't keep its selection when recreated (e.g. night mode); the shown fragment does.
+            supportFragmentManager.fragments.firstOrNull { !it.isHidden }?.tag?.toIntOrNull()?.let { selectTab(it) }
         }
         // Covers the reboot-less case: the service was killed, or the app was reinstalled.
         CompanionService.update(this)
@@ -74,7 +79,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     /** OsmAnd's main menu item "Transit timetables" lands here while the app is already open. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (isTimetableLink(intent)) binding.tabs.selectedItemId = R.id.tab_timetables
+        if (isTimetableLink(intent)) selectTab(R.id.tab_timetables)
         if (isUpdateLink(intent)) {
             updateRequested = true
             onUpdateChanged()
@@ -185,6 +190,10 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
         transaction.commit()
     }
 
+    private fun selectTab(id: Int) {
+        binding.tabs.getTabAt(TAB_IDS.indexOf(id))?.select()
+    }
+
     private fun newTab(id: Int): Fragment = when (id) {
         R.id.tab_log -> LogFragment()
         else -> TimetableFragment()
@@ -208,8 +217,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             binding.root.updatePadding(left = bars.left, right = bars.right, bottom = ime.bottom)
             insets
         }
-        // Replaces the tab bar's own handling, which pads it by the keyboard's height as well: with the root
-        // already above the keyboard, that left a keyboard-sized blank under the tabs.
+        // The tab bar clears the navigation bar, except with the keyboard up: the root is already above it.
         ViewCompat.setOnApplyWindowInsetsListener(binding.tabs) { tabs, insets ->
             val keyboardUp = insets.isVisible(WindowInsetsCompat.Type.ime())
             tabs.updatePadding(bottom = if (keyboardUp) 0 else insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom)
@@ -223,4 +231,9 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     }
 
     private fun toast(message: Int) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+
+    private companion object {
+        /** The tabs in activity_main's tab bar, in order. */
+        val TAB_IDS = listOf(R.id.tab_timetables, R.id.tab_log)
+    }
 }

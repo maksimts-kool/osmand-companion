@@ -1,5 +1,55 @@
 <resources>
+    <!-- The stop and trip screens. -->
     <style name="Theme.Companion" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand</item>
+    </style>
+
+    <!--
+        The home screen (header, tabs, dialogs) in OsmAnd's colors (colors.xml): white lists, blue for what's
+        active (orange at night, as in OsmAnd), OsmAnd's orange logo. Every color role is set so none of
+        Material's default purple shows through.
+    -->
+    <style name="Theme.Companion.OsmAnd">
+        <item name="colorPrimary">@color/osm_active</item>
+        <item name="colorOnPrimary">@color/osm_on_active</item>
+        <item name="colorPrimaryContainer">@color/osm_active_tint</item>
+        <item name="colorOnPrimaryContainer">@color/osm_active</item>
+        <item name="colorPrimaryInverse">@color/osm_active_pressed</item>
+        <item name="colorSecondary">@color/osm_active</item>
+        <item name="colorOnSecondary">@color/osm_on_active</item>
+        <!-- Tonal buttons and the selected tab: OsmAnd's light-blue "active" tint with blue on it. -->
+        <item name="colorSecondaryContainer">@color/osm_active_tint</item>
+        <item name="colorOnSecondaryContainer">@color/osm_active</item>
+        <item name="colorTertiary">@color/osm_orange</item>
+        <item name="colorOnTertiary">@color/osm_on_active</item>
+        <item name="colorTertiaryContainer">@color/osm_inactive_bg</item>
+        <item name="colorOnTertiaryContainer">@color/osm_orange</item>
+        <item name="colorError">@color/osm_error</item>
+        <item name="colorOnError">@color/osm_on_active</item>
+
+        <item name="android:colorBackground">@color/osm_list_bg</item>
+        <item name="colorOnBackground">@color/osm_text</item>
+        <item name="colorSurface">@color/osm_list_bg</item>
+        <item name="colorOnSurface">@color/osm_text</item>
+        <item name="colorSurfaceVariant">@color/osm_inactive_bg</item>
+        <item name="colorOnSurfaceVariant">@color/osm_text_secondary</item>
+        <item name="colorSurfaceInverse">@color/osm_text</item>
+        <item name="colorOnSurfaceInverse">@color/osm_list_bg</item>
+        <item name="colorSurfaceBright">@color/osm_card_bg</item>
+        <item name="colorSurfaceDim">@color/osm_activity_bg</item>
+        <item name="colorSurfaceContainerLowest">@color/osm_card_bg</item>
+        <item name="colorSurfaceContainerLow">@color/osm_card_bg</item>
+        <item name="colorSurfaceContainer">@color/osm_app_bar</item>
+        <item name="colorSurfaceContainerHigh">@color/osm_buttons_bg</item>
+        <item name="colorSurfaceContainerHighest">@color/osm_inactive_bg</item>
+        <item name="colorOutline">@color/osm_icon</item>
+        <item name="colorOutlineVariant">@color/osm_divider</item>
+        <item name="colorControlNormal">@color/osm_icon</item>
+        <!-- OsmAnd's bars are flat colors: no primary-tinted overlay on raised ones like the tab bar. -->
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="android:windowLightStatusBar">@bool/light_status_bar</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorTertiary">@color/text_secondary</item>
     </style>
 </resources>

@@ -122,9 +122,41 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
+    <com.google.android.material.divider.MaterialDivider
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!--
+        One tab per feature, like OsmAnd's tabs: each takes an equal share of the width and all of it is
+        tappable, with a line over the selected one. MainActivity.TAB_IDS lists them in this order.
+    -->
+    <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabs"
+        style="@style/Widget.Material3.TabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:menu="@menu/tabs" />
+        android:background="?attr/colorSurfaceContainer"
+        app:tabGravity="fill"
+        app:tabIconTint="@color/tab_content"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorFullWidth="true"
+        app:tabIndicatorGravity="top"
+        app:tabIndicatorHeight="3dp"
+        app:tabMode="fixed"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabTextAppearance="?attr/textAppearanceLabelLarge"
+        app:tabTextColor="?attr/colorOnSurfaceVariant">
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:icon="@drawable/ic_tab_timetables"
+            android:text="@string/tab_timetables" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:icon="@drawable/ic_tab_log"
+            android:text="@string/tab_log" />
+    </com.google.android.material.tabs.TabLayout>
 </LinearLayout>

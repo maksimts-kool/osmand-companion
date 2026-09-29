@@ -1,7 +1,30 @@
 <resources>
     <color name="brand">#1E88E5</color>
     <color name="ic_launcher_background">#1E88E5</color>
-    <color name="status_ok">#43A047</color>
-    <color name="status_warning">#FB8C00</color>
-    <color name="status_error">#E53935</color>
+
+    <!-- The home screen's connection status, in OsmAnd's colors: color_ok, osmand_orange, color_warning. -->
+    <color name="status_ok">#32CD32</color>
+    <color name="status_warning">#FF8F00</color>
+    <color name="status_error">#EE3232</color>
+
+    <!--
+        OsmAnd's own colors (from its res/values/colors.xml), so the home screen looks like OsmAnd: see
+        Theme.Companion.OsmAnd. Day ones here, night ones in values-night.
+    -->
+    <color name="osm_list_bg">#FFFFFF</color>              <!-- list_background_color_light -->
+    <color name="osm_card_bg">#FFFFFF</color>              <!-- card_and_list_background_light -->
+    <color name="osm_app_bar">#FFFFFF</color>              <!-- app_bar_secondary_light -->
+    <color name="osm_activity_bg">#F0F0F0</color>          <!-- activity_background_color_light -->
+    <color name="osm_inactive_bg">#F0F0F0</color>          <!-- inactive_buttons_and_links_bg_light -->
+    <color name="osm_buttons_bg">#F2F2F2</color>           <!-- ctx_menu_buttons_bg_light -->
+    <color name="osm_text">#1A1A1A</color>                 <!-- text_color_primary_light -->
+    <color name="osm_text_secondary">#666666</color>       <!-- text_color_secondary_light -->
+    <color name="osm_icon">#727272</color>                 <!-- icon_color_default_light -->
+    <color name="osm_divider">#E6E6E6</color>              <!-- divider_color_light -->
+    <color name="osm_active">#237BFF</color>               <!-- active_color_primary_light -->
+    <color name="osm_active_pressed">#0F67EB</color>       <!-- active_buttons_and_links_bg_pressed_light -->
+    <color name="osm_on_active">#FFFFFF</color>            <!-- active_buttons_and_links_text_light -->
+    <color name="osm_active_tint">#1A237BFF</color>        <!-- switch_button_active_light -->
+    <color name="osm_orange">#FF8800</color>               <!-- icon_color_osmand_light -->
+    <color name="osm_error">#EE3232</color>                <!-- color_warning -->
 </resources>

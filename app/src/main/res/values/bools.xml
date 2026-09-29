@@ -1,0 +1,4 @@
+<resources>
+    <!-- Dark status bar icons over the light header; light ones at night (values-night). -->
+    <bool name="light_status_bar">true</bool>
+</resources>
