@@ -1,4 +1,6 @@
 <resources>
     <string name="core_notification_channel">Фоновые функции</string>
     <string name="core_notification_title">Подключено к OsmAnd</string>
+    <string name="core_watcher_label">OsmAnd Companion: запуск вместе с OsmAnd</string>
+    <string name="core_watcher_description">Запускает OsmAnd Companion, когда вы открываете OsmAnd, чтобы расписания были на карте OsmAnd, даже если Companion был закрыт, и останавливает его, когда вы уходите из OsmAnd. Видит только то, какое приложение открыто, но не то, что на экране, и ничего не сохраняет.</string>
 </resources>

@@ -98,13 +98,13 @@ class CompanionService : Service() {
         private val CONNECTION_CHECK_MS = TimeUnit.SECONDS.toMillis(15)
 
         /**
-         * Starts, updates or stops the service to match which features are on. Call it after turning one
-         * on or off. Only from the foreground (activity) or a boot broadcast: Android 12+ forbids starting
-         * it from the background.
+         * Starts, updates or stops the service to match which features are on, and, with [FollowOsmAnd], whether
+         * OsmAnd is in use. Call it after turning one on or off. Only from the foreground (activity), a boot
+         * broadcast or [OsmAndWatcher]: Android 12+ forbids starting it from the background.
          */
         fun update(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
-            if (context.companion.features.any { it.isEnabled }) {
+            if (FollowOsmAnd.wantsService(context)) {
                 ContextCompat.startForegroundService(context, intent)
             } else {
                 context.stopService(intent)

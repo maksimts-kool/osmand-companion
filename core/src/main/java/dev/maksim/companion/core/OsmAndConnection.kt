@@ -104,6 +104,24 @@ class OsmAndConnection(private val context: Context) {
     }
 
     /**
+     * Lets go of OsmAnd, so it can close ([FollowOsmAnd]): while bound, Android keeps its process, and brings it back
+     * if it's closed. [connect] binds again. Main thread.
+     */
+    fun disconnect() {
+        if (osmandPackage == null) return
+        try {
+            context.unbindService(serviceConnection)
+        } catch (_: IllegalArgumentException) {
+            // Not bound after all.
+        }
+        api = null
+        osmandPackage = null
+        hasAccess = false
+        AppLog.log("Disconnected from OsmAnd")
+        notifyListeners()
+    }
+
+    /**
      * Probes access with getAppInfo() (null when this app is disabled in OsmAnd).
      * Call it again when the user returns from OsmAnd; notifies access listeners once access appears.
      * Must be called on the main thread.

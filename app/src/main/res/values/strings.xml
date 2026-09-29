@@ -11,10 +11,21 @@
     <string name="open_osmand">Open OsmAnd</string>
 
     <string name="tab_timetables">Timetables</string>
-    <string name="tab_log">Log</string>
+    <string name="tab_log">Settings</string>
 
     <string name="log">Log</string>
     <string name="clear">Clear</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="follow_title">With OsmAnd</string>
+    <string name="follow_start">Start with OsmAnd</string>
+    <string name="follow_start_hint">Opens Companion\'s features whenever OsmAnd opens, even if Companion was closed.</string>
+    <string name="follow_stop">Stop when OsmAnd closes</string>
+    <string name="follow_stop_hint">A minute after you leave OsmAnd, Companion stops and its notification goes away. Needs Start with OsmAnd, which starts it again.</string>
+    <string name="follow_dialog_on">Android only tells an app that another one opened through an accessibility service. Companion\'s only sees which app is in front, never what\'s on the screen.\n\nOn the next screen, open “OsmAnd Companion: start with OsmAnd” and turn it on.</string>
+    <string name="follow_dialog_restricted">If Android says the setting is restricted, open Settings → Apps → OsmAnd Companion, tap ⋮ → Allow restricted settings, and try again.</string>
+    <string name="follow_dialog_off">To stop starting with OsmAnd, turn off “OsmAnd Companion: start with OsmAnd” on the next screen.</string>
+    <string name="follow_open_settings">Open settings</string>
 
     <string name="version">Version %1$s</string>
     <string name="update_check">Check for updates</string>

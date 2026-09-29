@@ -24,6 +24,20 @@
                 android:value="Stays connected to OsmAnd to report saved trip recordings and to keep transit timetables on its map up to date" />
         </service>
 
+        <!-- Start and stop with OsmAnd: see FollowOsmAnd. Off until the user turns it on in Android's settings. -->
+        <service
+            android:name=".OsmAndWatcher"
+            android:exported="true"
+            android:label="@string/core_watcher_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/osmand_watcher" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

@@ -87,6 +87,25 @@ or the main menu. OsmAnd starts those itself; Android doesn't let a background a
   wrong one (R30 from Tallinn to Tapa says "Tallinn"). A headsign that's missing, or names where the trip starts
   rather than where it ends, is replaced by the trip's last stop.
 
+## Start and stop with OsmAnd
+
+*Settings* tab → *With OsmAnd*:
+
+- **Start with OsmAnd**: the features start whenever OsmAnd opens, even if Companion's process was gone (swiped
+  away, killed by battery savers, or not started since an update). Android tells no app when another one opens,
+  and OsmAnd only talks to apps already connected to it, so this is an accessibility service (`OsmAndWatcher`),
+  which the user turns on in Android's settings. It only gets the package of each window that comes to the front,
+  never the window's contents, and keeps nothing. On Android 13+ a sideloaded app first needs *App info → ⋮ →
+  Allow restricted settings*.
+- **Stop when OsmAnd closes** (needs the above): a minute after OsmAnd was last in front, the service and its
+  notification stop, and Companion lets go of OsmAnd so it can close too (while bound, Android keeps it running).
+  Companion's own screens over OsmAnd and keyboards don't count as leaving; before stopping it also asks OsmAnd
+  whether its map is on screen, since unlocking the phone doesn't always report which app is in front, and it
+  waits while the screen is off.
+
+`FollowOsmAnd.wantsService` decides whether `CompanionService` runs: a feature is on, and, with both settings on,
+OsmAnd is in use.
+
 ## Updates
 
 The app updates itself from this repo's [GitHub Releases](https://github.com/maksimts-kool/osmand-maksimts/releases):
@@ -134,7 +153,8 @@ CI gets the same key from the repository secrets `SIGNING_KEYSTORE_BASE64` (the 
 ```
 app/                      shell: home screen with a tab per feature, OsmAnd status, log;
                           update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
-core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog
+core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog,
+                          OsmAndWatcher + FollowOsmAnd (start and stop with OsmAnd)
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient,
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider,
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    OsmAndWatcher: only which window comes to the front, from any app (to tell when OsmAnd is left), and never the
+    window's contents.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/core_watcher_description"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="300" />

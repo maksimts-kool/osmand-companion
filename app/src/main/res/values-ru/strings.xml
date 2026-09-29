@@ -10,10 +10,21 @@
     <string name="open_osmand">Открыть OsmAnd</string>
 
     <string name="tab_timetables">Расписания</string>
-    <string name="tab_log">Журнал</string>
+    <string name="tab_log">Настройки</string>
 
     <string name="log">Журнал</string>
     <string name="clear">Очистить</string>
+    <string name="cancel">Отмена</string>
+
+    <string name="follow_title">Вместе с OsmAnd</string>
+    <string name="follow_start">Запускать вместе с OsmAnd</string>
+    <string name="follow_start_hint">Включает функции Companion каждый раз, когда открывается OsmAnd, даже если Companion был закрыт.</string>
+    <string name="follow_stop">Останавливать, когда OsmAnd закрыт</string>
+    <string name="follow_stop_hint">Через минуту после выхода из OsmAnd Companion останавливается, и его уведомление исчезает. Нужен запуск вместе с OsmAnd, который включит его снова.</string>
+    <string name="follow_dialog_on">Android сообщает приложению об открытии другого только через службу специальных возможностей. Служба Companion видит только то, какое приложение открыто, но не то, что на экране.\n\nНа следующем экране откройте «OsmAnd Companion: запуск вместе с OsmAnd» и включите её.</string>
+    <string name="follow_dialog_restricted">Если Android пишет, что настройка ограничена, откройте Настройки → Приложения → OsmAnd Companion, нажмите ⋮ → «Разрешить ограниченные настройки» и попробуйте снова.</string>
+    <string name="follow_dialog_off">Чтобы не запускаться вместе с OsmAnd, выключите «OsmAnd Companion: запуск вместе с OsmAnd» на следующем экране.</string>
+    <string name="follow_open_settings">Открыть настройки</string>
 
     <string name="version">Версия %1$s</string>
     <string name="update_check">Проверить обновления</string>
