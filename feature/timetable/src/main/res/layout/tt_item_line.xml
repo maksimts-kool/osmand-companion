@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A route serving a stop, in the stop's header: its number on the mode's color. Jumps to its timetable. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="36dp"
+    android:background="@drawable/tt_route_badge_bg"
+    android:foreground="?attr/selectableItemBackground"
+    android:fontFeatureSettings="tnum"
+    android:gravity="center"
+    android:includeFontPadding="false"
+    android:maxLines="1"
+    android:minWidth="44dp"
+    android:paddingHorizontal="10dp"
+    android:textAppearance="?attr/textAppearanceTitleMedium"
+    android:textColor="@android:color/white"
+    android:textStyle="bold"
+    tools:text="24A" />

@@ -9,6 +9,7 @@ import androidx.core.view.isVisible
 import com.google.android.material.color.MaterialColors
 import dev.maksim.companion.timetable.databinding.TtHeaderBinding
 import dev.maksim.companion.timetable.databinding.TtItemFactBinding
+import dev.maksim.companion.timetable.databinding.TtItemLineBinding
 import dev.maksim.companion.timetable.databinding.TtItemRowBinding
 import dev.maksim.companion.timetable.databinding.TtItemSectionBinding
 
@@ -30,7 +31,9 @@ internal object Rows {
 
     /**
      * Fills the shared header of the stop and trip screens. [route] goes next to the vehicle icon in the badge;
-     * [facts] are icon and text pairs shown as pills under the title.
+     * [facts] are icon and text pairs shown as pills under the title. A stop shows its [lines] there instead, big
+     * and in their own colors, as they're what you look for first; [onLine] makes them tappable, and those not in
+     * [running] are dimmed.
      */
     fun header(
         header: TtHeaderBinding,
@@ -39,6 +42,9 @@ internal object Rows {
         title: CharSequence,
         subtitle: CharSequence?,
         facts: List<Pair<Int, CharSequence>> = emptyList(),
+        lines: List<Line> = emptyList(),
+        running: Set<String>? = null,
+        onLine: ((Line) -> Unit)? = null,
     ) {
         val card = header.card
         card.setCardBackgroundColor(
@@ -59,12 +65,24 @@ internal object Rows {
         header.subtitle.text = subtitle
         header.subtitle.isVisible = !subtitle.isNullOrEmpty()
         header.facts.removeAllViews()
-        header.facts.isVisible = facts.isNotEmpty()
-        for ((icon, text) in facts) TtItemFactBinding.inflate(LayoutInflater.from(card.context), header.facts, true).root.run {
+        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty()
+        val inflater = LayoutInflater.from(card.context)
+        for ((icon, text) in facts) TtItemFactBinding.inflate(inflater, header.facts, true).root.run {
             this.text = text
             setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
         }
+        for (line in lines) TtItemLineBinding.inflate(inflater, header.facts, true).root.run {
+            text = line.name
+            contentDescription = context.getString(R.string.tt_route_line, line.name)
+            backgroundTintList = ColorStateList.valueOf(Mode.of(line.mode).color)
+            val runs = running == null || line.name in running
+            alpha = if (runs) 1f else NOT_RUNNING_ALPHA
+            if (onLine != null && runs) setOnClickListener { onLine(line) } else isClickable = false
+        }
     }
+
+    /** A route with no departures on the chosen day. */
+    private const val NOT_RUNNING_ALPHA = 0.4f
 
     /** A stop in a list: vehicle icon, name, and what serves it. */
     fun stop(parent: ViewGroup, stop: Stop, note: String?, onClick: () -> Unit) {

@@ -98,14 +98,16 @@
                 tools:visibility="visible" />
         </LinearLayout>
 
-        <!-- Small facts as pills, e.g. date, number of stops, how long it takes. -->
-        <LinearLayout
+        <!-- Small facts as pills (date, number of stops, how long it takes), or a stop's routes. Wraps. -->
+        <com.google.android.material.chip.ChipGroup
             android:id="@+id/facts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:orientation="horizontal"
+            android:animateLayoutChanges="true"
             android:paddingHorizontal="12dp"
-            android:visibility="gone" />
+            android:visibility="gone"
+            app:chipSpacingHorizontal="8dp"
+            app:chipSpacingVertical="8dp" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

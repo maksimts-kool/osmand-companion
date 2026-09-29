@@ -25,7 +25,7 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | **Map** | The stops around the map center, while it's in Estonia: colored dots from zoom 13, vehicle icons from 15. |
 | **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and the next departures as detail rows: `20:14  5 → Metsakooli · 3 min · live`. When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
 | **Stop menu → Next departures** | Reloads them right now, 10 of them. |
-| **Stop menu → Full day** | Opens the rest of today by route in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap a time for that trip. |
+| **Stop menu → Full day** | Opens the rest of today by route, soonest first, in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap a time for that trip. |
 | **Stop menu → Show in Companion** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*) |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
 | **Main menu → Transit timetables** | Opens this app's stop search. |
@@ -35,10 +35,29 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 allows an app that may **display over other apps**; the *Timetables* tab asks for it. Without it, they post a
 notification to tap instead.
 
-In this app, a stop's timetable has the live next departures, then every route's times for today or any of the
-next 6 days, laid out by hour like the timetables at Estonian stops. Tap a departure, a minute or a route to see
+In this app, a stop's header shows the routes serving it as big badges in their own colors (dimmed when they don't
+run that day); tap one to jump to its timetable. Below are the live next departures, then every route's times for
+today or any of the next 6 days, laid out by hour like the timetables at Estonian stops, the route leaving soonest
+first. Each route starts at the hour of its next departure; tapping its header shows the whole day, then closes
+it, then goes back to the upcoming hours. Routes done for today go last, closed. Tap a departure or a minute to see
 that trip: every stop along the route with its time (the route's timetable). *Show in OsmAnd* moves OsmAnd's map
 to the stop.
+
+### Route on OsmAnd's map
+
+A trip's route button shows it in OsmAnd the way OsmAnd shows its own transport routes: the line in the vehicle's
+color, from the operator's own shape in today's feed, with a marker per stop, all of it in view, and the route's
+card open at the bottom ("Bus 10 → Vana-Pääsküla", every stop with its time). Like OsmAnd's own, it's gone as soon
+as the card is closed (a tap elsewhere on the map, or Back): OsmAnd's API has no event for that, so the app asks it
+every half second whether its menu is still open (`isMenuOpen`). OsmAnd only takes lines as tracks, so the route is a
+track while it's shown, and deleted after. If the app's process dies meanwhile, it's removed the next time a
+timetable screen opens, or on the timetable feature's next update.
+
+OsmAnd's API can't open one of its built-in routes, so this is the way to see the current one. Those built-in routes
+(tap one of OsmAnd's stops, then a route) come from OpenStreetMap, and many in Estonia are out of date: Elron's R32
+is still RE32 there and misses 9 stops, bus 24 still goes through Mustamäe. So before switching, the app asks OSM
+(Overpass API) for the route and compares its stops with the trip's; if they differ, it says how, since that's what
+tapping OsmAnd's own stops will show.
 
 ### Why it lives there
 
@@ -62,7 +81,11 @@ or the main menu. OsmAnd starts those itself; Android doesn't let a background a
   or after a minute for fresh departures. When OsmAnd is in the background, nothing is fetched.
 - **Icons**: OsmAnd takes a point's picture only as a URI, so `StopIconProvider` renders one PNG per vehicle type.
 - OsmAnd keeps layers, widgets and buttons in memory only, so they're added again whenever OsmAnd (re)connects.
-- A trip's last stop is also a "departure" in the feed (towards the stop itself); those are dropped.
+- A trip's last stop is also a "departure" in the feed (towards the stop itself); those are dropped, by the trip's
+  last stop rather than its headsign, since some headsigns are wrong.
+- **Destinations**: Elron's feed leaves the headsign out on some trips (R32 to Rakvere) and gives others the
+  wrong one (R30 from Tallinn to Tapa says "Tallinn"). A headsign that's missing, or names where the trip starts
+  rather than where it ends, is replaced by the trip's last stop.
 
 ## Updates
 
@@ -113,7 +136,9 @@ app/                      shell: home screen with a tab per feature, OsmAnd stat
                           update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
 core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient,
-                          StopActivity, TripActivity, TimetableFragment, StopIconProvider
+                          StopActivity, TripActivity, TimetableFragment, StopIconProvider,
+                          OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
+                          States (Lottie loading/empty/error)
 ```
 
 A feature implements `BackgroundFeature` (`isEnabled`, `start()`, `stop()`) and is listed in `CompanionApp`.
@@ -143,5 +168,14 @@ adb logcat | grep OsmandAidlService      # OsmAnd's side: shows "enabled: true/f
 ## Stack
 
 AGP 9.4 (built-in Kotlin), Gradle 9.8, compileSdk/targetSdk 36, minSdk 24, WorkManager,
-`net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`).
-Timetable data: peatus.ee (Transpordiamet).
+`net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`), Lottie.
+Timetable data: peatus.ee (Transpordiamet). Route check: OpenStreetMap contributors, via the Overpass API.
+
+## Credits
+
+Animations from LottieFiles, free under the [Lottie Simple License](https://lottiefiles.com/page/license),
+recolored in the app to fit its theme (`feature/timetable/src/main/res/raw`):
+
+- Loading: [Bus Loader](https://lottiefiles.com/free-animation/bus-loader-LF8V0uZBm4) by Bijay Subba Limbu
+- Couldn't load: [No Internet Connection](https://lottiefiles.com/free-animation/no-internet-connection-jWCR3yXdDT)
+- Nothing leaves: [Clock Time](https://lottiefiles.com/free-animation/clock-time-YX86xw76OL)

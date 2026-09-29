@@ -2,15 +2,19 @@ package dev.maksim.companion.timetable
 
 import android.content.Context
 import android.content.Intent
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.LocaleList
 import android.view.View
+import android.view.animation.LinearInterpolator
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.animation.doOnEnd
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -18,7 +22,6 @@ import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import dev.maksim.companion.timetable.databinding.TtActivityDaySheetBinding
-import dev.maksim.companion.timetable.databinding.TtItemSheetMessageBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetRouteBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetTimeBinding
 import java.io.IOException
@@ -28,7 +31,8 @@ import java.util.concurrent.Executors
  * The Full day button in a stop's OsmAnd menu opens this over OsmAnd's map: the rest of today by route, in
  * OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd. (OsmAnd's API can only put text rows in
  * its own menu.) It runs in a task of its own, so closing it goes straight back to OsmAnd rather than to this app.
- * Tapping a time opens that trip, and Full timetable the stop's timetable, in its place ([leaveFor]).
+ * Routes leaving soonest come first. Tapping a time opens that trip, and Full timetable the stop's timetable, in
+ * its place ([leaveFor]).
  */
 class DaySheetActivity : AppCompatActivity() {
 
@@ -42,6 +46,16 @@ class DaySheetActivity : AppCompatActivity() {
 
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
+
+    /** Turns the Refresh icon while loading. */
+    private val spin by lazy {
+        ObjectAnimator.ofFloat(binding.refresh, View.ROTATION, 0f, 360f).apply {
+            duration = SPIN_MS
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            doOnEnd { repeatCount = ValueAnimator.INFINITE }
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(locales?.let { OsmAndStopUi.localized(newBase, it) } ?: newBase)
@@ -100,6 +114,7 @@ class DaySheetActivity : AppCompatActivity() {
         binding.close.setOnClickListener { dismiss() }
         onBackPressedDispatcher.addCallback(this) { dismiss() }
         binding.refresh.setOnClickListener { load() }
+        States.loading(binding.content, getColor(R.color.tt_osm_accent))
         binding.fullTimetable.setOnClickListener { leaveFor(StopActivity.intent(this, stopId, stopName)) }
     }
 
@@ -120,6 +135,7 @@ class DaySheetActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        spin.cancel()
         background.shutdownNow()
         super.onDestroy()
     }
@@ -149,6 +165,7 @@ class DaySheetActivity : AppCompatActivity() {
         val id = ++request
         val unknown = getString(R.string.tt_stop_unknown)
         binding.progress.isVisible = true
+        if (!spin.isStarted) spin.start()
         background.execute {
             val result = runCatching { peatus.timetable(stopId, Estonia.serviceDate()) ?: throw IOException(unknown) }
             runOnUiThread { if (id == request && !isDestroyed) show(result, System.currentTimeMillis()) }
@@ -157,22 +174,22 @@ class DaySheetActivity : AppCompatActivity() {
 
     private fun show(result: Result<Pair<Stop, List<RouteDay>>>, now: Long) {
         binding.progress.isVisible = false
+        // Finishes the turn it's on rather than stopping at an angle.
+        spin.repeatCount = 0
         binding.content.removeAllViews()
         val (stop, routes) = result.getOrElse {
-            message(getString(R.string.tt_load_failed, it.message))
+            States.error(binding.content, getString(R.string.tt_load_failed, it.message)) { load() }
             return
         }
         stopName = stop.name
         header(stop.name, Mode.of(stop.mode))
         binding.subtitle.text = getString(R.string.tt_sheet_subtitle, TransitFormat.clock(now))
-        var shown = 0
-        for (route in routes) {
-            val left = route.times.filter { TransitFormat.serviceTime(route.serviceDay, it.first) >= now - GRACE_MS }
-            if (left.isEmpty()) continue
-            addRoute(route, left, now)
-            shown++
-        }
-        if (shown == 0) message(getString(R.string.tt_no_more_today))
+        val left = routes.map { route ->
+            route to route.times.filter { TransitFormat.serviceTime(route.serviceDay, it.first) >= now - GRACE_MS }
+        }.filter { it.second.isNotEmpty() }
+        left.sortedBy { (route, times) -> TransitFormat.serviceTime(route.serviceDay, times.first().first) }
+            .forEach { (route, times) -> addRoute(route, times, now) }
+        if (left.isEmpty()) States.empty(binding.content, getString(R.string.tt_no_more_today))
     }
 
     private fun addRoute(route: RouteDay, left: List<Pair<Int, String>>, now: Long) {
@@ -197,10 +214,6 @@ class DaySheetActivity : AppCompatActivity() {
         }
     }
 
-    private fun message(text: String) {
-        TtItemSheetMessageBinding.inflate(layoutInflater, binding.content, true).root.text = text
-    }
-
     companion object {
         private const val EXTRA_STOP_ID = "stop_id"
         private const val EXTRA_STOP_NAME = "stop_name"
@@ -212,6 +225,8 @@ class DaySheetActivity : AppCompatActivity() {
 
         /** A departure a few seconds past is probably still at the stop. */
         private const val GRACE_MS = 30_000L
+
+        private const val SPIN_MS = 800L
 
         /** The stop whose sheet is on screen, if any; tells [TimetableFeature] whether Android let it open this. */
         @Volatile

@@ -6,10 +6,13 @@ import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
-import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dev.maksim.companion.core.companion
 import dev.maksim.companion.core.padForSystemBars
 import dev.maksim.companion.timetable.databinding.TtActivityTripBinding
 import dev.maksim.companion.timetable.databinding.TtItemTripStopBinding
@@ -18,11 +21,15 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
-/** One run of a route: every stop it calls at and when, the route's timetable seen from the vehicle. */
+/**
+ * One run of a route: every stop it calls at and when, the route's timetable seen from the vehicle. The header's
+ * route button draws it on OsmAnd's map ([showRoute]), after warning if OsmAnd's own version of it is out of date.
+ */
 class TripActivity : AppCompatActivity() {
 
     private lateinit var binding: TtActivityTripBinding
     private val peatus = PeatusClient()
+    private val osmCheck = OsmRouteCheck()
     private val background = Executors.newSingleThreadExecutor()
     private var trip: Trip? = null
 
@@ -31,7 +38,14 @@ class TripActivity : AppCompatActivity() {
         binding = TtActivityTripBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.root.padForSystemBars()
-        binding.header.back.setOnClickListener { finish() }
+        with(binding.header) {
+            back.setOnClickListener { finish() }
+            action.setIconResource(R.drawable.tt_ic_route)
+            action.contentDescription = getString(R.string.tt_route_in_osmand)
+            action.tooltipText = action.contentDescription
+            action.setOnClickListener { showRoute() }
+        }
+        States.loading(binding.content, MaterialColors.getColor(binding.content, androidx.appcompat.R.attr.colorPrimary))
         load()
     }
 
@@ -46,6 +60,7 @@ class TripActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         binding.root.postDelayed(tick, TICK_MS)
+        background.execute { OsmAndRoute.clearLeftover(this, companion.osmand) }
     }
 
     override fun onStop() {
@@ -74,15 +89,15 @@ class TripActivity : AppCompatActivity() {
     private fun show(result: Result<Trip>) {
         binding.progress.isVisible = false
         trip = result.getOrElse {
-            val content = binding.content
-            content.removeAllViews()
-            Rows.section(content, getString(R.string.tt_load_failed, it.message))
-            content.addView(MaterialButton(this).apply {
-                setText(R.string.tt_retry)
-                setOnClickListener { load() }
-            })
+            States.error(binding.content, getString(R.string.tt_load_failed, it.message)) {
+                States.loading(binding.content, MaterialColors.getColor(binding.content, androidx.appcompat.R.attr.colorPrimary))
+                load()
+            }
             return
         }
+        binding.header.action.isVisible = true
+        binding.content.alpha = 0f
+        binding.content.animate().alpha(1f).setDuration(FADE_MS).start()
         render(scrollToFrom = true)
     }
 
@@ -179,6 +194,83 @@ class TripActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Draws the trip on OsmAnd's map and switches to it. First checks OSM, where OsmAnd's own transport routes come
+     * from, and says so if its version of this route is out of date, since tapping OsmAnd's own stops shows that.
+     */
+    private fun showRoute() {
+        val trip = trip ?: return
+        val osmand = companion.osmand
+        if (osmand.osmandPackage == null && osmand.findInstalledOsmand() == null) {
+            return Toast.makeText(this, R.string.tt_osmand_missing, Toast.LENGTH_LONG).show()
+        }
+        if (!osmand.checkAccess()) return Toast.makeText(this, R.string.tt_route_no_access, Toast.LENGTH_LONG).show()
+        binding.progress.isVisible = true
+        binding.header.action.isEnabled = false
+        val key = "${trip.route}|${trip.headsign}|${trip.mode}|${trip.stops.size}"
+        background.execute {
+            val shape = runCatching { peatus.tripShape(trip.id) }.getOrDefault(emptyList())
+            val check = checks[key] ?: runCatching { osmCheck.check(trip) }.getOrNull()?.also { checks[key] = it }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                binding.progress.isVisible = false
+                binding.header.action.isEnabled = true
+                when (check) {
+                    null -> {
+                        Toast.makeText(this, R.string.tt_route_check_failed, Toast.LENGTH_SHORT).show()
+                        openRoute(trip, shape)
+                    }
+                    OsmRouteCheck.Result.Matches -> openRoute(trip, shape)
+                    else -> warnOutdated(trip, check) { openRoute(trip, shape) }
+                }
+            }
+        }
+    }
+
+    private fun warnOutdated(trip: Trip, check: OsmRouteCheck.Result, then: () -> Unit) {
+        fun names(list: List<String>) = list.take(MAX_NAMES).joinToString(", ") + if (list.size > MAX_NAMES) ", …" else ""
+        val message = when (check) {
+            is OsmRouteCheck.Result.Outdated -> buildList {
+                if (!check.osmRef.equals(trip.route, true)) add(getString(R.string.tt_route_renamed, check.osmRef))
+                val stops = trip.stops.map { it.stop.name }.distinct().size
+                if (check.missing.isNotEmpty()) {
+                    add(getString(R.string.tt_route_missing_stops, check.missing.size, stops, names(check.missing)))
+                }
+                if (check.extra.isNotEmpty()) add(getString(R.string.tt_route_extra_stops, names(check.extra)))
+                add(getString(R.string.tt_route_outdated_note))
+            }.joinToString("\n\n")
+            else -> getString(R.string.tt_route_missing, trip.route) + "\n\n" + getString(R.string.tt_route_outdated_note)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setIcon(
+                getDrawable(R.drawable.tt_ic_warning)?.mutate()?.apply {
+                    setTint(MaterialColors.getColor(binding.root, androidx.appcompat.R.attr.colorError))
+                },
+            )
+            .setTitle(R.string.tt_route_outdated_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.tt_route_show) { _, _ -> then() }
+            .setNegativeButton(R.string.tt_cancel, null)
+            .show()
+    }
+
+    /** Draws the route in OsmAnd with its card open, and switches there; it goes away once the card is closed. */
+    private fun openRoute(trip: Trip, shape: List<LatLon>) {
+        val osmand = companion.osmand
+        val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
+        binding.progress.isVisible = true
+        background.execute {
+            val shown = OsmAndRoute.show(this, osmand, trip, shape, fromStopId)
+            val launch = (osmand.osmandPackage ?: osmand.findInstalledOsmand())?.let { packageManager.getLaunchIntentForPackage(it) }
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                binding.progress.isVisible = false
+                if (shown && launch != null) startActivity(launch)
+                else Toast.makeText(this, R.string.tt_route_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun showHeader(trip: Trip, mode: Mode, times: List<Long>) {
         val minutes = ((times.lastOrNull() ?: 0L) - (times.firstOrNull() ?: 0L)) / 60_000
         Rows.header(
@@ -201,6 +293,13 @@ class TripActivity : AppCompatActivity() {
         private const val EXTRA_FROM_STOP_ID = "from_stop_id"
         private const val TICK_MS = 30_000L
         private const val PAST_ALPHA = 0.5f
+        private const val FADE_MS = 200L
+
+        /** Stops named in the out-of-date warning; the rest are "…". */
+        private const val MAX_NAMES = 6
+
+        /** What OSM had for each route this session, so asking again doesn't bother Overpass. */
+        private val checks = java.util.concurrent.ConcurrentHashMap<String, OsmRouteCheck.Result>()
         private const val LATE = 0xFFE65100.toInt()
 
         fun intent(context: Context, tripId: String, serviceDay: Long, fromStopId: String?): Intent =

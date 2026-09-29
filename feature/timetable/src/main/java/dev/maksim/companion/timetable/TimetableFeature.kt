@@ -115,6 +115,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             nearbyStops = emptyList()
             AppLog.log("Timetables: added stop layer, menu buttons and widget to OsmAnd (${ui.locales.toLanguageTags()})")
         }
+        OsmAndRoute.clearLeftover(context, osmand)
         val info = osmand.call("getAppInfo") { it.appInfo } ?: return
         // Nobody is looking: don't spend data or peatus.ee's capacity.
         if (!info.isMapVisible) return

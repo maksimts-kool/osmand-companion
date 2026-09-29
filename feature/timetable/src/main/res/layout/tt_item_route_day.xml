@@ -66,23 +66,38 @@
                     tools:text="Metsakooli - Männiku" />
             </LinearLayout>
 
-            <!-- How soon the next one leaves; hidden when that's more than two hours away. -->
+            <!-- How soon the next one leaves, or that it's done for today; opens the next trip. -->
             <TextView
                 android:id="@+id/next"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
+                android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/tt_pill_bg"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
                 android:fontFeatureSettings="tnum"
                 android:gravity="center"
+                android:includeFontPadding="false"
                 android:maxLines="1"
+                android:minHeight="28dp"
                 android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorOnSurface"
                 tools:text="in 7 min" />
+
+            <!-- The dropdown: upcoming hours → whole day → closed → upcoming hours... -->
+            <ImageView
+                android:id="@+id/fold"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="8dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/tt_ic_expand"
+                app:tint="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <com.google.android.material.divider.MaterialDivider
+            android:id="@+id/divider"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:dividerInsetEnd="16dp"

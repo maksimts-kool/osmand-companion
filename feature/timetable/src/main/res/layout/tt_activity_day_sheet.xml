@@ -81,6 +81,17 @@
                     tools:text="Rest of today · updated 20:08" />
             </LinearLayout>
 
+            <!-- Spins while loading. -->
+            <ImageButton
+                android:id="@+id/refresh"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/tt_refresh"
+                android:src="@drawable/tt_ic_refresh"
+                android:tooltipText="@string/tt_refresh"
+                app:tint="@color/tt_osm_icon" />
+
             <ImageButton
                 android:id="@+id/close"
                 android:layout_width="48dp"
@@ -123,31 +134,22 @@
             android:layout_height="1dp"
             android:background="@color/tt_osm_divider" />
 
-        <LinearLayout
+        <!-- One full-width button, like the single action at the bottom of OsmAnd's own menus. -->
+        <FrameLayout
             android:id="@+id/buttons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="16dp"
             android:paddingVertical="12dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/refresh"
-                style="@style/TtSheetButton"
-                android:layout_width="0dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="@string/tt_refresh"
-                app:icon="@drawable/tt_ic_refresh" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/fullTimetable"
                 style="@style/TtSheetButton"
-                android:layout_width="0dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
+                android:maxLines="1"
                 android:text="@string/tt_full_timetable"
-                app:icon="@drawable/tt_ic_open" />
-        </LinearLayout>
+                app:icon="@drawable/tt_ic_open"
+                app:iconGravity="textStart" />
+        </FrameLayout>
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

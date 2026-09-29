@@ -22,4 +22,6 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    // Loading, empty and offline animations (from LottieFiles, see README).
+    implementation("com.airbnb.android:lottie:6.7.1")
 }

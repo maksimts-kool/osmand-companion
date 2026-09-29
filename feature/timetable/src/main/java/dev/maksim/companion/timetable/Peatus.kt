@@ -21,11 +21,17 @@ data class Stop(
      * regional buses serve says so instead: [PeatusClient.TROLLEYBUS], [PeatusClient.REGIONAL].
      */
     val mode: String?,
-    /** Short names of the routes serving it. */
-    val routes: List<String> = emptyList(),
+    /** The routes serving it, in [RouteOrder]. */
+    val lines: List<Line> = emptyList(),
     /** Upcoming departures, soonest first; only filled by queries that ask for them. */
     val departures: List<Departure> = emptyList(),
-)
+) {
+    /** Short names of the routes serving it. */
+    val routes: List<String> get() = lines.map { it.name }
+}
+
+/** A route as a stop lists it: its short name ("5", "R32") and mode (see [PeatusClient.modeOf]). */
+data class Line(val name: String, val mode: String)
 
 data class Departure(
     val tripId: String,
@@ -63,6 +69,8 @@ data class Trip(
     val serviceDay: Long,
     val stops: List<TripStop>,
 )
+
+data class LatLon(val lat: Double, val lon: Double)
 
 data class TripStop(val stop: Stop, val scheduled: Int, val expected: Int, val isRealtime: Boolean) {
     fun time(serviceDay: Long): Long = (serviceDay + expected) * 1000
@@ -128,7 +136,7 @@ class PeatusClient {
               stop(id: ${'$'}id) {
                 $STOP
                 stoptimesForServiceDate(date: ${'$'}date, omitNonPickups: true) {
-                  pattern { headsign route { $ROUTE longName } }
+                  pattern { headsign route { $ROUTE longName } stops { gtfsId name } }
                   stoptimes { scheduledDeparture serviceDay headsign trip { gtfsId } }
                 }
               }
@@ -140,18 +148,31 @@ class PeatusClient {
         val byDirection = LinkedHashMap<Triple<String, String, String>, MutableList<Pair<Int, String>>>()
         val details = HashMap<Triple<String, String, String>, Pair<String, Long>>()
         for (pattern in json.getJSONArray("stoptimesForServiceDate").objects()) {
-            val route = pattern.getJSONObject("pattern").getJSONObject("route")
+            val info = pattern.getJSONObject("pattern")
+            val route = info.getJSONObject("route")
             val shortName = route.getString("shortName")
             val mode = modeOf(route)
-            for (time in pattern.getJSONArray("stoptimes").objects()) {
-                val headsign = time.optNullableString("headsign")
-                    ?: pattern.getJSONObject("pattern").optNullableString("headsign")
-                    ?: ""
-                if (isArrival(stop.name, headsign)) continue
+            val stops = info.optJSONArray("stops")?.objects().orEmpty()
+            val first = stops.firstOrNull()
+            val last = stops.lastOrNull()
+            // Where the pattern ends is only an arrival, unless it's a loop that also starts here.
+            val endsHere = last?.getString("gtfsId") == stop.id
+            val startsHere = first?.getString("gtfsId") == stop.id
+            if (endsHere && !startsHere) continue
+            // On a loop the feed lists this stop at both ends of each trip; the first one is the departure.
+            val seenTrips = HashSet<String>()
+            for (time in pattern.getJSONArray("stoptimes").objects().sortedBy { it.getInt("scheduledDeparture") }) {
+                val tripId = time.getJSONObject("trip").getString("gtfsId")
+                if (!seenTrips.add(tripId)) continue
+                val headsign = destination(
+                    time.optNullableString("headsign") ?: info.optNullableString("headsign"),
+                    first?.getString("name"),
+                    last?.getString("name"),
+                )
+                if (last == null && isArrival(stop.name, headsign)) continue
                 // Several patterns (e.g. short turns) can share route and headsign; show them as one.
                 val key = Triple(shortName, headsign, mode)
-                byDirection.getOrPut(key) { mutableListOf() } +=
-                    time.getInt("scheduledDeparture") to time.getJSONObject("trip").getString("gtfsId")
+                byDirection.getOrPut(key) { mutableListOf() } += time.getInt("scheduledDeparture") to tripId
                 details[key] = route.optString("longName") to time.getLong("serviceDay")
             }
         }
@@ -178,11 +199,14 @@ class PeatusClient {
             ?: return null
         val route = json.getJSONObject("route")
         val times = json.getJSONArray("stoptimesForDate").objects()
+        val stopName = { time: JSONObject? -> time?.getJSONObject("stop")?.getString("name") }
         return Trip(
             id = json.getString("gtfsId"),
             route = route.getString("shortName"),
             mode = modeOf(route),
-            headsign = json.optNullableString("tripHeadsign") ?: "",
+            headsign = destination(
+                json.optNullableString("tripHeadsign"), stopName(times.firstOrNull()), stopName(times.lastOrNull()),
+            ),
             longName = route.optString("longName"),
             serviceDay = times.firstOrNull()?.getLong("serviceDay") ?: 0L,
             stops = times.map {
@@ -194,6 +218,21 @@ class PeatusClient {
                 )
             },
         )
+    }
+
+    /**
+     * The way a trip goes, as the operator drew it for the feed (GTFS shapes). Falls back to straight lines
+     * between the stops when the feed has no shape for it.
+     */
+    fun tripShape(tripId: String): List<LatLon> {
+        val query = """
+            query(${'$'}id: String!) { trip(id: ${'$'}id) { tripGeometry { points } stops { lat lon } } }
+        """
+        val json = request(query, JSONObject().put("id", tripId)).optJSONObject("trip") ?: return emptyList()
+        json.optJSONObject("tripGeometry")?.optNullableString("points")?.let { points ->
+            Polyline.decode(points).takeIf { it.size >= 2 }?.let { return it }
+        }
+        return json.optJSONArray("stops")?.objects().orEmpty().map { LatLon(it.getDouble("lat"), it.getDouble("lon")) }
     }
 
     private fun stopOf(json: JSONObject, departures: Int): Stop {
@@ -209,10 +248,11 @@ class PeatusClient {
             lat = json.getDouble("lat"),
             lon = json.getDouble("lon"),
             mode = kind?.takeIf { vehicleMode == "BUS" && (it == TROLLEYBUS || it == REGIONAL) } ?: vehicleMode,
-            routes = routes.map { it.getString("shortName") }.distinct().sortedWith(RouteOrder),
+            lines = routes.map { Line(it.getString("shortName"), modeOf(it)) }.distinctBy { it.name }
+                .sortedWith(compareBy(RouteOrder) { it.name }),
             departures = json.optJSONArray("stoptimesWithoutPatterns")?.objects().orEmpty()
+                .filterNot { isArrival(json.getString("gtfsId"), name, it) }
                 .map(::departureOf)
-                .filterNot { isArrival(name, it.headsign) }
                 .take(departures),
         )
     }
@@ -224,7 +264,11 @@ class PeatusClient {
             tripId = trip.getString("gtfsId"),
             route = route.getString("shortName"),
             mode = modeOf(route),
-            headsign = json.optNullableString("headsign") ?: trip.optNullableString("tripHeadsign") ?: "",
+            headsign = destination(
+                json.optNullableString("headsign") ?: trip.optNullableString("tripHeadsign"),
+                trip.optJSONObject("departureStoptime")?.optJSONObject("stop")?.optNullableString("name"),
+                trip.optJSONObject("arrivalStoptime")?.optJSONObject("stop")?.optNullableString("name"),
+            ),
             serviceDay = json.getLong("serviceDay"),
             scheduled = json.getInt("scheduledDeparture"),
             expected = json.getInt("realtimeDeparture"),
@@ -249,10 +293,36 @@ class PeatusClient {
 
     /**
      * The feed lets you "board" at a trip's last stop, so the end of every line would show up as a departure
-     * towards the stop itself ("Balti jaam" at Balti jaam). A trip whose headsign is this stop ends here.
+     * towards the stop itself ("Balti jaam" at Balti jaam). A trip ends here if its last stop is this one, and
+     * it doesn't also start here (a loop), or this isn't its start time.
      */
+    private fun isArrival(stopId: String, stopName: String, time: JSONObject): Boolean {
+        val trip = time.getJSONObject("trip")
+        val start = trip.optJSONObject("departureStoptime")
+        val end = trip.optJSONObject("arrivalStoptime")?.optJSONObject("stop")
+            ?: return isArrival(stopName, time.optNullableString("headsign") ?: trip.optNullableString("tripHeadsign") ?: "")
+        if (end.optString("gtfsId") != stopId) return false
+        return start?.optJSONObject("stop")?.optString("gtfsId") != stopId ||
+            start.optInt("scheduledDeparture") != time.getInt("scheduledDeparture")
+    }
+
+    /** For when the feed doesn't say where the trip ends: a trip whose headsign is this stop ends here. */
     private fun isArrival(stopName: String, headsign: String) =
         headsign.isNotEmpty() && baseName(headsign) == baseName(stopName)
+
+    /**
+     * Where a trip goes. Usually its headsign, but some operators' feeds (Elron's) leave it out on some trips,
+     * or give every trip of a line the same one, so trains from Tallinn to Tapa say "Tallinn". A headsign that's
+     * missing, or names where the trip starts rather than where it ends, gives way to the trip's last stop.
+     */
+    private fun destination(headsign: String?, firstStop: String?, lastStop: String?): String {
+        val sign = headsign?.trim().orEmpty()
+        if (sign.isEmpty()) return lastStop.orEmpty()
+        if (firstStop != null && lastStop != null &&
+            baseName(sign) == baseName(firstStop) && baseName(sign) != baseName(lastStop)
+        ) return lastStop
+        return sign
+    }
 
     private fun baseName(name: String) = name.substringBefore(" (").trim().lowercase(Locale.ROOT)
 
@@ -303,7 +373,8 @@ class PeatusClient {
         private const val STOP = "gtfsId name code lat lon vehicleMode routes { $ROUTE }"
         private const val NEXT = "stoptimesWithoutPatterns(numberOfDepartures: \$n, omitNonPickups: true) {" +
             " scheduledDeparture realtimeDeparture realtime serviceDay headsign" +
-            " trip { gtfsId tripHeadsign route { $ROUTE } } }"
+            " trip { gtfsId tripHeadsign route { $ROUTE }" +
+            " departureStoptime { scheduledDeparture stop { gtfsId name } } arrivalStoptime { stop { gtfsId name } } } }"
     }
 }
 
@@ -319,6 +390,32 @@ object RouteOrder : Comparator<String> {
         val (pb, nb, sb) = mb.destructured
         return compareValuesBy(pa to na, pb to nb, { it.first }, { it.second.toLong() })
             .takeIf { it != 0 } ?: sa.compareTo(sb)
+    }
+}
+
+/** Google's encoded polyline format, which OpenTripPlanner uses for geometry. */
+internal object Polyline {
+    fun decode(encoded: String): List<LatLon> {
+        val points = ArrayList<LatLon>()
+        var index = 0
+        var lat = 0
+        var lon = 0
+        while (index < encoded.length) {
+            for (i in 0..1) {
+                var shift = 0
+                var result = 0
+                var byte: Int
+                do {
+                    byte = encoded[index++].code - 63
+                    result = result or (byte and 0x1F shl shift)
+                    shift += 5
+                } while (byte >= 0x20 && index < encoded.length)
+                val delta = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+                if (i == 0) lat += delta else lon += delta
+            }
+            points += LatLon(lat / 1e5, lon / 1e5)
+        }
+        return points
     }
 }
 
