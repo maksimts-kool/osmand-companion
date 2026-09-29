@@ -117,7 +117,10 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
 
     private fun isTimetableLink(intent: Intent?) = intent?.data?.toString() == OsmAndStopUi.DEEP_LINK
 
-    /** targetSdk 36 is always edge-to-edge: the header clears the status bar, the tabs the navigation bar. */
+    /**
+     * targetSdk 36 is always edge-to-edge: the header clears the status bar, the tabs the navigation bar, and
+     * with the keyboard up everything sits above it.
+     */
     private fun applySystemBarPadding() {
         val header = binding.header
         val base = header.paddingTop
@@ -126,7 +129,13 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener {
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             header.updatePadding(top = base + bars.top)
             binding.root.updatePadding(left = bars.left, right = bars.right, bottom = ime.bottom)
-            binding.tabs.updatePadding(bottom = if (ime.bottom > 0) 0 else bars.bottom)
+            insets
+        }
+        // Replaces the tab bar's own handling, which pads it by the keyboard's height as well: with the root
+        // already above the keyboard, that left a keyboard-sized blank under the tabs.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.tabs) { tabs, insets ->
+            val keyboardUp = insets.isVisible(WindowInsetsCompat.Type.ime())
+            tabs.updatePadding(bottom = if (keyboardUp) 0 else insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom)
             insets
         }
     }

@@ -1,0 +1,16 @@
+<resources>
+    <!--
+        OsmAnd's own colors (5.4, from its APK), so the Full day sheet looks like part of OsmAnd. The night ones
+        are in values-night; the sheet picks day or night the way OsmAnd's map screen does.
+    -->
+    <color name="tt_osm_bg">#FFFFFF</color>                 <!-- list_background_color_light -->
+    <color name="tt_osm_text">#1A1A1A</color>               <!-- text_color_primary_light -->
+    <color name="tt_osm_text_secondary">#666666</color>     <!-- text_color_secondary_light -->
+    <color name="tt_osm_icon">#727272</color>               <!-- icon_color_default_light -->
+    <color name="tt_osm_accent">#237BFF</color>             <!-- active_color_primary_light -->
+    <color name="tt_osm_on_accent">#FFFFFF</color>          <!-- active_buttons_and_links_text_light -->
+    <color name="tt_osm_divider">#E6E6E6</color>            <!-- divider_color_light -->
+    <color name="tt_osm_button_outline">#CCCCCC</color>     <!-- stroked_buttons_and_links_outline_light -->
+    <color name="tt_osm_time_bg">#F2F2F2</color>            <!-- ctx_menu_buttons_bg_light -->
+    <color name="tt_osm_scrim">#66000000</color>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A departure time in the Full day sheet; opens that trip. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="30dp"
+    android:background="@drawable/tt_sheet_time_bg"
+    android:backgroundTint="@color/tt_osm_time_bg"
+    android:foreground="@drawable/tt_sheet_time_ripple"
+    android:fontFeatureSettings="tnum"
+    android:gravity="center"
+    android:paddingHorizontal="8dp"
+    android:textColor="@color/tt_osm_text"
+    android:textSize="14sp"
+    tools:text="20:34" />

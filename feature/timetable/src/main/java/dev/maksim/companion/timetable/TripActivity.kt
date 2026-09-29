@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.maksim.companion.core.padForSystemBars
@@ -96,6 +97,7 @@ class TripActivity : AppCompatActivity() {
 
         val content = binding.content
         content.removeAllViews()
+        content.overlay.clear()
         val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
         // The vehicle is between the last stop it has passed and the next; -1 before it sets off.
         val last = times.indexOfLast { it <= now }
@@ -118,19 +120,16 @@ class TripActivity : AppCompatActivity() {
                 this.passed = passed
                 passedIn = if (passed) 1f else if (between && i == last + 1) progress * 2 - 1 else 0f
                 passedOut = if (!passed) 0f else if (between && i == last) progress * 2 else 1f
-                // The halfway point between two stops is the border between their rows.
-                vehicleAt = when {
-                    !between -> null
-                    i == last && progress < 0.5f -> 0.5f + progress
-                    i == last + 1 && progress >= 0.5f -> progress - 0.5f
-                    else -> null
-                }
             }
-            if (row.line.vehicleAt != null) {
-                row.root.clipChildren = false
-                row.root.outlineProvider = null
-                row.root.translationZ = 1f
+            // Where the vehicle is along this row, 0 at the top and 1 at the bottom. The halfway point between two
+            // stops is the border between their rows.
+            val vehicleAt = when {
+                !between -> null
+                i == last && progress < 0.5f -> 0.5f + progress
+                i == last + 1 && progress >= 0.5f -> progress - 0.5f
+                else -> null
             }
+            vehicleAt?.let { at -> placeVehicle(row, at, mode) }
 
             val status = mutableListOf<String>()
             val delay = (tripStop.expected - tripStop.scheduled) / 60
@@ -167,6 +166,16 @@ class TripActivity : AppCompatActivity() {
         // Start at the stop you came from, with a couple of stops before it in view.
         if (scrollToFrom) fromRow?.let { row ->
             binding.scroll.post { binding.scroll.scrollTo(0, maxOf(0, row.top - row.height * 2)) }
+        }
+    }
+
+    /** Puts the vehicle [at] that far down [row]'s piece of the line, over the rows, once they're laid out. */
+    private fun placeVehicle(row: TtItemTripStopBinding, at: Float, mode: Mode) {
+        val marker = VehicleMarker(this, mode)
+        row.root.doOnLayout {
+            val line = row.line
+            marker.moveTo(row.root.left + line.left + line.width / 2f, row.root.top + line.top + line.height * at)
+            binding.content.overlay.add(marker)
         }
     }
 

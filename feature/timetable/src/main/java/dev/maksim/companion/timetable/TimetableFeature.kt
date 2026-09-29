@@ -142,6 +142,29 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         ui.updateWidget(widgetStop(center.latitude, center.longitude), now)
     }
 
+    /**
+     * For this app's stop screen: opens [stop]'s menu on OsmAnd's map, with its next departures, then calls
+     * [then] on the worker thread with whether that worked; the caller brings OsmAnd to the front. False, and
+     * nothing happens, while timetables aren't on in OsmAnd.
+     */
+    fun showInOsmand(stop: Stop, then: (shown: Boolean) -> Unit): Boolean {
+        val handler = handler ?: return false
+        handler.post {
+            if (registeredWith == null || !osmand.hasAccess) return@post then(false)
+            // One from the map has its next departures; the stop screen's may not.
+            val known = nearbyStops.find { it.id == stop.id }
+                ?: try {
+                    peatus.stop(stop.id, DEPARTURES)
+                } catch (e: IOException) {
+                    null
+                }
+                ?: stop
+            pinnedStopId = stop.id
+            then(ui.showMenu(known, System.currentTimeMillis()))
+        }
+        return true
+    }
+
     /** The stop you last pressed a button on while it's still loaded, else the one nearest the map center. */
     private fun widgetStop(lat: Double, lon: Double): Stop? =
         nearbyStops.find { it.id == pinnedStopId }
@@ -155,16 +178,11 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             try {
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId)
+                    OsmAndStopUi.BUTTON_FULL_DAY -> showFullDay(stopId, now)
                     OsmAndStopUi.BUTTON_DEPARTURES -> {
                         val stop = peatus.stop(stopId, MENU_DEPARTURES) ?: return@post
                         nearbyStops = nearbyStops.map { if (it.id == stopId) stop.copy(departures = stop.departures.take(DEPARTURES)) else it }
                         ui.showInMenu(stop, ui.departureDetails(stop, now))
-                    }
-                    OsmAndStopUi.BUTTON_FULL_DAY -> {
-                        val (stop, days) = peatus.timetable(stopId, Estonia.serviceDate()) ?: return@post
-                        // Keep the "towards ..." subtitle, which comes from the departures.
-                        val known = nearbyStops.find { it.id == stopId } ?: stop
-                        ui.showInMenu(known, ui.fullDayDetails(days, now))
                     }
                 }
             } catch (e: IOException) {
@@ -175,17 +193,29 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         }
     }
 
-    /**
-     * Opens the stop's timetable here. OsmAnd is in front, so Android may refuse to start our activity from the
-     * background (10+); if it hasn't shown up shortly, a notification opens it instead.
-     */
+    /** Opens the stop's timetable here. */
     private fun showInApp(stopId: String) {
         val name = nearbyStops.find { it.id == stopId }?.name
-        val intent = StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        open(StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), name) {
+            StopActivity.resumedStopId == stopId
+        }
+    }
+
+    /** Opens the rest of today at the stop in a sheet over OsmAnd's map, dark when OsmAnd is. */
+    private fun showFullDay(stopId: String, now: Long) {
+        val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
+        open(DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now)), stop.name) {
+            DaySheetActivity.resumedStopId == stopId
+        }
+    }
+
+    /**
+     * OsmAnd is in front, so Android may refuse to start our activity from the background (10+); if it hasn't
+     * shown up shortly ([isOpen] still false), a notification opens it instead.
+     */
+    private fun open(intent: Intent, name: String?, isOpen: () -> Boolean) {
         context.startActivity(intent)
-        handler?.postDelayed({
-            if (StopActivity.resumedStopId != stopId) notifyOpen(intent, name)
-        }, OPEN_CHECK_MS)
+        handler?.postDelayed({ if (!isOpen()) notifyOpen(intent, name) }, OPEN_CHECK_MS)
     }
 
     private fun notifyOpen(intent: Intent, name: String?) {

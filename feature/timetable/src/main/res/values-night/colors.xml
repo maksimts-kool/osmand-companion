@@ -1,0 +1,12 @@
+<resources>
+    <color name="tt_osm_bg">#1E1F20</color>                 <!-- list_background_color_dark -->
+    <color name="tt_osm_text">#E6E6E6</color>               <!-- text_color_primary_dark -->
+    <color name="tt_osm_text_secondary">#8C8C8C</color>     <!-- text_color_secondary_dark -->
+    <color name="tt_osm_icon">#727272</color>               <!-- icon_color_default_dark -->
+    <color name="tt_osm_accent">#D28521</color>             <!-- active_color_primary_dark -->
+    <color name="tt_osm_on_accent">#EBEBEB</color>          <!-- active_buttons_and_links_text_dark -->
+    <color name="tt_osm_divider">#2C3033</color>            <!-- divider_color_dark -->
+    <color name="tt_osm_button_outline">#303336</color>     <!-- stroked_buttons_and_links_outline_dark -->
+    <color name="tt_osm_time_bg">#222526</color>            <!-- ctx_menu_buttons_bg_dark -->
+    <color name="tt_osm_scrim">#99000000</color>
+</resources>

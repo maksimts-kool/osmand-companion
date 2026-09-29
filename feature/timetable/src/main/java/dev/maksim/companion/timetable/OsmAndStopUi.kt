@@ -9,6 +9,7 @@ import net.osmand.aidlapi.IOsmAndAidlCallback
 import net.osmand.aidlapi.contextmenu.AContextMenuButton
 import net.osmand.aidlapi.contextmenu.ContextMenuButtonsParams
 import net.osmand.aidlapi.contextmenu.RemoveContextMenuButtonsParams
+import net.osmand.aidlapi.customization.PreferenceParams
 import net.osmand.aidlapi.gpx.AGpxBitmap
 import net.osmand.aidlapi.logcat.OnLogcatMessageParams
 import net.osmand.aidlapi.map.ALatLon
@@ -18,6 +19,7 @@ import net.osmand.aidlapi.maplayer.RemoveMapLayerParams
 import net.osmand.aidlapi.maplayer.UpdateMapLayerParams
 import net.osmand.aidlapi.maplayer.point.AMapPoint
 import net.osmand.aidlapi.maplayer.point.RemoveMapPointParams
+import net.osmand.aidlapi.maplayer.point.ShowMapPointParams
 import net.osmand.aidlapi.maplayer.point.UpdateMapPointParams
 import net.osmand.aidlapi.mapwidget.AMapWidget
 import net.osmand.aidlapi.mapwidget.AddMapWidgetParams
@@ -36,8 +38,8 @@ import net.osmand.aidlapi.search.SearchResult
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
  *    has a switch for it). Tapping a stop shows its name, which way it goes, and the next departures as the
  *    menu's detail rows;
- *  - three buttons in that menu: "Next departures" reloads them now, "Full day" lists the rest of today by route,
- *    "Show in Companion" opens the stop's full timetable in this app;
+ *  - three buttons in that menu: "Next departures" reloads them now, "Full day" opens the rest of today by route
+ *    in a sheet over the map ([DaySheetActivity]), "Show in Companion" opens the stop's full timetable in this app;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
  *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
@@ -134,6 +136,18 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         shown[point.id] = point
     }
 
+    /**
+     * Centers OsmAnd's map on [stop] and opens its menu, as if it had been tapped there, in place of any menu
+     * that was open. OsmAnd shows it once its map is in front. False if OsmAnd didn't take it.
+     */
+    fun showMenu(stop: Stop, now: Long): Boolean {
+        val point = pointOf(stop, departureDetails(stop, now))
+        // Into the layer as well, so the stop is still there once the menu is closed.
+        osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(listOf(point)))) }
+        shown[point.id] = point
+        return osmand.call("showMapPoint") { it.showMapPoint(ShowMapPointParams(LAYER_ID, point)) } == true
+    }
+
     fun departureDetails(stop: Stop, now: Long): List<String> = buildList {
         val upcoming = stop.departures.filter { it.time >= now - GRACE_MS }
         if (upcoming.isEmpty()) add(context.getString(R.string.tt_no_departures))
@@ -141,17 +155,26 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         add(context.getString(R.string.tt_updated, TransitFormat.clock(now)))
     }
 
-    /** "5 → Metsakooli: 20:14 20:34 20:54 …", one row per route and direction, for the rest of today. */
-    fun fullDayDetails(days: List<RouteDay>, now: Long): List<String> = buildList {
-        add(context.getString(R.string.tt_rest_of_today))
-        for (day in days) {
-            val left = day.times.map { TransitFormat.serviceTime(day.serviceDay, it.first) }.filter { it >= now - GRACE_MS }
-            if (left.isEmpty()) continue
-            val times = left.take(MAX_TIMES_PER_ROW).joinToString(" ") { TransitFormat.clock(it) }
-            add("${day.route} → ${day.headsign}: $times${if (left.size > MAX_TIMES_PER_ROW) " …" else ""}")
+    /**
+     * Whether OsmAnd's map screen looks dark right now, at a place near [lat], [lon], so the Full day sheet can
+     * match it; null when OsmAnd goes by its light sensor or the phone, and then the sheet follows the phone.
+     */
+    fun isNight(lat: Double, lon: Double, now: Long): Boolean? = when (preference(PREF_DAY_NIGHT)) {
+        "DAY" -> false
+        "NIGHT" -> true
+        "AUTO" -> Sun.isDown(lat, lon, now)
+        // Like OsmAnd's own screens: its dark theme is 0, light 1, and 2 follows the phone.
+        "APP_THEME" -> when (preference(PREF_APP_THEME)) {
+            "0" -> true
+            "1" -> false
+            else -> null
         }
-        if (size == 1) add(context.getString(R.string.tt_no_more_today))
-        add(context.getString(R.string.tt_updated, TransitFormat.clock(now)))
+        else -> null
+    }
+
+    /** One of OsmAnd's settings, for its current profile. */
+    private fun preference(id: String): String? = osmand.call("getPreference") { api ->
+        PreferenceParams(id).takeIf { api.getPreference(it) }?.value
     }
 
     /** Shows the next departure from [stop] in the widget; null clears it (e.g. the map left Estonia). */
@@ -236,7 +259,8 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         private const val WIDGET_ORDER = 100
         private const val MAX_ZOOM = 25
         private const val POINTS_PER_CALL = 40
-        private const val MAX_TIMES_PER_ROW = 16
+        private const val PREF_DAY_NIGHT = "daynight_mode"
+        private const val PREF_APP_THEME = "osmand_theme"
         private const val NO_VALUE = "—"
 
         /** A departure a few seconds past is probably still at the stop. */

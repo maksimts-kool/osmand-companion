@@ -2,7 +2,9 @@
     <string name="tt_feature_title">Transit timetables</string>
     <string name="tt_intro">Timetables for every bus, tram, train and ferry stop in Estonia, from peatus.ee, right on OsmAnd\'s map.</string>
     <string name="tt_show_in_osmand_switch">Show timetables in OsmAnd</string>
-    <string name="tt_where_hint">• Map: stops appear around the map center when it\'s in Estonia (dots from zoom 13, icons from 15). Tap one for its next departures. Configure map → the app\'s name hides them.\n• In a stop\'s menu: Next departures reloads them, Full day lists the rest of today by route, Show in Companion opens the stop here.\n• Configure screen → widgets: Next departure, for the stop you last opened. Tap it for the full timetable.\n• Main menu: Transit timetables opens the search below.</string>
+    <string name="tt_where_hint">• Map: stops appear around the map center when it\'s in Estonia (dots from zoom 13, icons from 15). Tap one for its next departures. Configure map → the app\'s name hides them.\n• In a stop\'s menu: Next departures reloads them, Full day opens the rest of today by route over the map, Show in Companion opens the stop here.\n• Configure screen → widgets: Next departure, for the stop you last opened. Tap it for the full timetable.\n• Main menu: Transit timetables opens the search below.</string>
+    <string name="tt_overlay_hint">Android only lets OsmAnd\'s Full day and Show in Companion buttons open right over OsmAnd if this app may display over other apps. Until then, they come as a notification to tap.</string>
+    <string name="tt_overlay_allow">Allow</string>
     <string name="tt_search_hint">Find a stop</string>
     <string name="tt_near_map">Near OsmAnd\'s map center</string>
     <string name="tt_near_map_empty">Open OsmAnd\'s map somewhere in Estonia to see the stops there, or search by name.</string>
@@ -23,8 +25,12 @@
     <string name="tt_stop_towards">%1$s · to %2$s</string>
     <string name="tt_no_departures">No departures in the next 24 hours</string>
     <string name="tt_no_departures_day">Nothing leaves from here this day</string>
-    <string name="tt_rest_of_today">Rest of today, by route:</string>
     <string name="tt_no_more_today">No more departures today</string>
+    <string name="tt_sheet_subtitle">Rest of today · updated %1$s</string>
+    <string name="tt_rest_of_today">Rest of today</string>
+    <string name="tt_refresh">Refresh</string>
+    <string name="tt_full_timetable">Full timetable</string>
+    <string name="tt_close">Close</string>
     <string name="tt_updated">Updated %1$s · peatus.ee</string>
     <string name="tt_load_failed">Couldn\'t load from peatus.ee: %1$s</string>
 
