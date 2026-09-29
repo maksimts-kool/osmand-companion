@@ -107,12 +107,7 @@ class StopActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        resumedStopId = stopId
-    }
-
-    override fun onPause() {
-        resumedStopId = null
-        super.onPause()
+        OpenedScreens.resumed(this, OpenedScreens.Screen.STOP, stopId)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -356,11 +351,6 @@ class StopActivity : AppCompatActivity() {
         private const val FOLD_MS = 250L
         private const val PULSE = 1.03f
         private const val PULSE_MS = 120L
-
-        /** The stop on screen, if any; tells [TimetableFeature] whether Android let it open this. */
-        @Volatile
-        var resumedStopId: String? = null
-            private set
 
         fun intent(context: Context, stopId: String, stopName: String?): Intent =
             Intent().setClassName(context.packageName, StopActivity::class.java.name)

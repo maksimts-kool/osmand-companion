@@ -126,12 +126,7 @@ class DaySheetActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        resumedStopId = stopId
-    }
-
-    override fun onPause() {
-        resumedStopId = null
-        super.onPause()
+        OpenedScreens.resumed(this, OpenedScreens.Screen.DAY_SHEET, stopId)
     }
 
     override fun onDestroy() {
@@ -227,11 +222,6 @@ class DaySheetActivity : AppCompatActivity() {
         private const val GRACE_MS = 30_000L
 
         private const val SPIN_MS = 800L
-
-        /** The stop whose sheet is on screen, if any; tells [TimetableFeature] whether Android let it open this. */
-        @Volatile
-        var resumedStopId: String? = null
-            private set
 
         /**
          * OsmAnd's language, for the sheets opened from now on; null is this app's. Not an intent extra: the

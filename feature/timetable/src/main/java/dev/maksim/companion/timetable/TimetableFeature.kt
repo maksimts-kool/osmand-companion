@@ -203,34 +203,41 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     /** Opens the stop's timetable here. */
     private fun showInApp(stopId: String) {
         val name = nearbyStops.find { it.id == stopId }?.name
-        open(StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), name) {
-            StopActivity.resumedStopId == stopId
-        }
+        open(StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), name, OpenedScreens.Screen.STOP, stopId)
     }
 
     /** Opens the rest of today at the stop in a sheet over OsmAnd's map, dark when OsmAnd is. */
     private fun showFullDay(stopId: String, now: Long) {
         val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
         DaySheetActivity.locales = ui.locales
-        open(DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now)), stop.name) {
-            DaySheetActivity.resumedStopId == stopId
-        }
+        open(DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now)), stop.name, OpenedScreens.Screen.DAY_SHEET, stopId)
     }
 
     /**
-     * OsmAnd is in front, so Android may refuse to start our activity from the background (10+); if it hasn't
-     * shown up shortly ([isOpen] still false), a notification opens it instead.
+     * OsmAnd is in front, so Android may refuse to start our activity from the background (10+); if it hasn't come
+     * up shortly, a notification opens it instead. "Come up" at any point since: it may already have been left
+     * again (see [OpenedScreens]), and if it only comes up later, it takes the notification back.
      */
-    private fun open(intent: Intent, name: String?, isOpen: () -> Boolean) {
+    private fun open(intent: Intent, name: String?, screen: OpenedScreens.Screen, stopId: String) {
+        val asked = OpenedScreens.now()
         context.startActivity(intent)
-        handler?.postDelayed({ if (!isOpen()) notifyOpen(intent, name) }, OPEN_CHECK_MS)
+        handler?.postDelayed({
+            if (OpenedScreens.resumedSince(screen, stopId, asked)) return@postDelayed
+            if (!notifyOpen(intent, name)) return@postDelayed
+            OpenedScreens.notified(screen, stopId)
+            // It may have come up between the check and now, before it could know to take this back.
+            if (OpenedScreens.resumedSince(screen, stopId, asked)) {
+                NotificationManagerCompat.from(context).cancel(OpenedScreens.NOTIFICATION_ID)
+            }
+        }, OPEN_CHECK_MS)
     }
 
-    private fun notifyOpen(intent: Intent, name: String?) {
+    /** True if the notification went out. */
+    private fun notifyOpen(intent: Intent, name: String?): Boolean {
         val notifications = NotificationManagerCompat.from(context)
         if (!notifications.areNotificationsEnabled()) {
             AppLog.log("Timetables: Android didn't let us open the stop from OsmAnd, and notifications are off")
-            return
+            return false
         }
         if (Build.VERSION.SDK_INT >= 26) {
             val channel = NotificationChannel(
@@ -251,18 +258,20 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 ),
             )
             .build()
-        try {
-            notifications.notify(OPEN_NOTIFICATION_ID, notification)
+        return try {
+            notifications.notify(OpenedScreens.NOTIFICATION_ID, notification)
+            true
         } catch (e: SecurityException) {
             AppLog.log("Timetables: can't post notification: ${e.message}")
+            false
         }
     }
 
     private companion object {
         const val KEY_ENABLED = "enabled"
         const val OPEN_CHANNEL_ID = "timetable_open"
-        const val OPEN_NOTIFICATION_ID = 2
-        val OPEN_CHECK_MS = TimeUnit.SECONDS.toMillis(2)
+        /** How long Android may take to bring a screen up over OsmAnd, even on a slow phone starting from cold. */
+        val OPEN_CHECK_MS = TimeUnit.SECONDS.toMillis(3)
         val OPEN_NOTIFICATION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1)
         val TICK_MS = TimeUnit.SECONDS.toMillis(4)
         val REFRESH_MS = TimeUnit.SECONDS.toMillis(60)
