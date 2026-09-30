@@ -9,7 +9,8 @@
 
     <!--
         OsmAnd's own colors (from its res/values/colors.xml), so the home screen looks like OsmAnd: see
-        Theme.Companion.OsmAnd. Day ones here, night ones in values-night.
+        Theme.Companion.OsmAnd. Day ones here, night ones in values-night. What's active is the logo's blue
+        (brand), day and night, where OsmAnd has its own blue by day and orange at night.
     -->
     <color name="osm_list_bg">#FFFFFF</color>              <!-- list_background_color_light -->
     <color name="osm_card_bg">#FFFFFF</color>              <!-- card_and_list_background_light -->
@@ -21,10 +22,9 @@
     <color name="osm_text_secondary">#666666</color>       <!-- text_color_secondary_light -->
     <color name="osm_icon">#727272</color>                 <!-- icon_color_default_light -->
     <color name="osm_divider">#E6E6E6</color>              <!-- divider_color_light -->
-    <color name="osm_active">#237BFF</color>               <!-- active_color_primary_light -->
-    <color name="osm_active_pressed">#0F67EB</color>       <!-- active_buttons_and_links_bg_pressed_light -->
-    <color name="osm_on_active">#FFFFFF</color>            <!-- active_buttons_and_links_text_light -->
-    <color name="osm_active_tint">#1A237BFF</color>        <!-- switch_button_active_light -->
-    <color name="osm_orange">#FF8800</color>               <!-- icon_color_osmand_light -->
+    <color name="osm_active">@color/brand</color>
+    <color name="osm_active_pressed">#1976D2</color>
+    <color name="osm_on_active">#FFFFFF</color>
+    <color name="osm_active_tint">#1A1E88E5</color>        <!-- brand at switch_button_active's 10% -->
     <color name="osm_error">#EE3232</color>                <!-- color_warning -->
 </resources>

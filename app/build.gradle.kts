@@ -82,4 +82,6 @@ dependencies {
     implementation(project(":feature:timetable"))
     // The daily update check.
     implementation("androidx.work:work-runtime:2.12.0")
+    // The update popup's animation; the same version as the timetable feature's.
+    implementation("com.airbnb.android:lottie:6.7.1")
 }

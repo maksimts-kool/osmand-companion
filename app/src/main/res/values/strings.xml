@@ -39,6 +39,9 @@
     <string name="update_button">Update to %1$s</string>
     <string name="update_downloading">Downloading… %1$d%%</string>
     <string name="update_installing">Installing…</string>
+    <string name="update_progress_title">Updating to %1$s</string>
+    <string name="update_hide">Hide</string>
+    <string name="update_failed">Update failed: %1$s</string>
     <string name="update_dialog_title">Version %1$s is out</string>
     <string name="update_installed_version">You have %1$s.</string>
     <string name="update_now">Update</string>

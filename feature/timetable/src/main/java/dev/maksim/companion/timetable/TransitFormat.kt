@@ -88,15 +88,6 @@ object TransitFormat {
     /** A time from a timetable: seconds since the service day started, which can pass 24:00. */
     fun serviceTime(serviceDay: Long, seconds: Int): Long = (serviceDay + seconds) * 1000
 
-    /** One departure on one line: "20:14  5 → Metsakooli · 3 min · live". */
-    fun departureLine(context: Context, departure: Departure, now: Long): String = buildString {
-        append(clockWithDay(departure.time, now, context.resources.configuration.locales[0]))
-        append("  ").append(departure.route)
-        if (departure.headsign.isNotEmpty()) append(" → ").append(departure.headsign)
-        relative(context, departure.time, now)?.let { append(" · ").append(it) }
-        if (departure.isRealtime) append(" · ").append(context.getString(R.string.tt_live))
-    }
-
     /** "Bus stop · to Pelguranna, Väike-Õismäe": tells the two sides of a street apart. */
     fun stopType(context: Context, stop: Stop): String {
         val type = context.getString(R.string.tt_stop_type, context.getString(Mode.of(stop.mode).label))

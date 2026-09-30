@@ -23,23 +23,24 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | Where in OsmAnd | What you get |
 | --- | --- |
 | **Map** | The stops around the map center, while it's in Estonia: colored dots from zoom 13, vehicle icons from 15. |
-| **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and the next departures as detail rows: `20:14  5 → Metsakooli · 3 min · live`. When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
-| **Stop menu → Next departures** | Reloads them right now, 10 of them. |
-| **Stop menu → Full day** | Opens the rest of today by route, soonest first, in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap a time for that trip. |
+| **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and when it was loaded (`Updated 20:08 · peatus.ee`). When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
+| **Stop menu → Next departures** | Opens the next departures like a departure board, up to 12 and none more than an hour away (big minutes to go, then route, destination, time, and live delay where available) in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap one for that trip. |
+| **Stop menu → Full day** | Opens the rest of today by route, soonest first, as rows of times, in the same kind of sheet. Tap a time for that trip. |
 | **Stop menu → Show in Companion** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*) |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
 | **Main menu → Transit timetables** | Opens this app's stop search. |
 | **Configure map** | The *OsmAnd Companion* item shows or hides the stops. |
 
-*Full day* and *Show in Companion* open this app's screens while OsmAnd is in front, which Android (10+) only
+*Next departures*, *Full day* and *Show in Companion* open this app's screens while OsmAnd is in front, which Android (10+) only
 allows an app that may **display over other apps**; the *Timetables* tab asks for it. Without it, they post a
 notification to tap instead.
 
 In this app, a stop's header shows the routes serving it as big badges in their own colors (dimmed when they don't
-run that day); tap one to jump to its timetable. Below are the live next departures, then every route's times for
-today or any of the next 6 days, laid out by hour like the timetables at Estonian stops, the route leaving soonest
-first. Each route starts at the hour of its next departure; tapping its header shows the whole day, then closes
-it, then goes back to the upcoming hours. Routes done for today go last, closed. Tap a departure or a minute to see
+run that day); tap one to jump to its timetable. Below is a card per route for today or any of the next 6 days,
+the route leaving soonest first. A card starts folded to one line of its next departures, so all the routes fit on
+screen: how soon the next one leaves, then the times after it, live where available (marked with a dot). Tapping
+it unfolds the times from the next departure's hour on, laid out by hour like the timetables at Estonian stops,
+then the whole day, then folds it again. Routes done for today go last. Tap a departure or a minute to see
 that trip: every stop along the route with its time (the route's timetable). *Show in OsmAnd* moves OsmAnd's map
 to the stop.
 
@@ -64,10 +65,9 @@ tapping OsmAnd's own stops will show.
 Plugins can't change OsmAnd's built-in transport stops or their menus: the AIDL API only lets an app add its
 own map layer, buttons in the menu of *its own* points, map widgets and main menu items. So the feature brings
 its own stops (`addMapLayer`) whose tap opens OsmAnd's standard context menu. That's the spot where you already
-look at a stop, and the menu's detail rows hold the departures. Buttons are added with `addContextMenuButtons`.
-After a button press, `updateMapPoint(..., updateOpenedMenuAndMap = true)` redraws the open menu with the
-answer. The full-day timetable doesn't fit a menu, so it's one tap away in the app, reached from the widget
-or the main menu. OsmAnd starts those itself; Android doesn't let a background app open a screen.
+look at a stop. Buttons are added with `addContextMenuButtons`. The menu's detail rows are only plain text, so the
+departures are one button away in sheets of this app's over OsmAnd's map, and the full timetable is in the app,
+reached from the widget or the main menu. OsmAnd starts those itself; Android doesn't let a background app open a screen.
 
 ### How it works
 
@@ -200,3 +200,5 @@ recolored in the app to fit its theme (`feature/timetable/src/main/res/raw`):
 - Loading: [Bus Loader](https://lottiefiles.com/free-animation/bus-loader-LF8V0uZBm4) by Bijay Subba Limbu
 - Couldn't load: [No Internet Connection](https://lottiefiles.com/free-animation/no-internet-connection-jWCR3yXdDT)
 - Nothing leaves: [Clock Time](https://lottiefiles.com/free-animation/clock-time-YX86xw76OL)
+
+The update popup's download animation (`app/src/main/res/raw/update_download.json`) is made for this app.

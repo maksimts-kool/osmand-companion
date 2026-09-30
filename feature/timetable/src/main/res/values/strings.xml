@@ -2,8 +2,8 @@
     <string name="tt_feature_title">Transit timetables</string>
     <string name="tt_intro">Timetables for every bus, tram, train and ferry stop in Estonia, from peatus.ee, right on OsmAnd\'s map.</string>
     <string name="tt_show_in_osmand_switch">Show timetables in OsmAnd</string>
-    <string name="tt_where_hint">• Map: tap a stop (zoom 13+) for its departures. Hide stops in Configure map.\n• Widget: add Next departure in Configure screen.\n• Main menu → Transit timetables opens this screen.</string>
-    <string name="tt_overlay_hint">Android only lets OsmAnd\'s Full day and Show in Companion buttons open right over OsmAnd if this app may display over other apps. Until then, they come as a notification to tap.</string>
+    <string name="tt_where_hint">• Map: tap a stop (zoom 13+), then Next departures or Full day. Hide stops in Configure map.\n• Widget: add Next departure in Configure screen.\n• Main menu → Transit timetables opens this screen.</string>
+    <string name="tt_overlay_hint">Android only lets OsmAnd\'s Next departures, Full day and Show in Companion buttons open right over OsmAnd if this app may display over other apps. Until then, they come as a notification to tap.</string>
     <string name="tt_overlay_allow">Allow</string>
     <string name="tt_search_hint">Find a stop</string>
     <string name="tt_near_map">Near OsmAnd\'s map center</string>
@@ -23,10 +23,11 @@
     <string name="tt_open_tap">Tap to open its timetable</string>
     <string name="tt_stop_type">%1$s stop</string>
     <string name="tt_stop_towards">%1$s · to %2$s</string>
-    <string name="tt_no_departures">No departures in the next 24 hours</string>
     <string name="tt_no_departures_day">Nothing leaves from here this day</string>
+    <string name="tt_no_departures_hour">No departures in the next hour</string>
     <string name="tt_no_more_today">No more departures today</string>
     <string name="tt_sheet_subtitle">Rest of today · updated %1$s</string>
+    <string name="tt_sheet_subtitle_next">Next departures · updated %1$s</string>
     <string name="tt_rest_of_today">Rest of today</string>
     <string name="tt_refresh">Refresh</string>
     <string name="tt_full_timetable">Full timetable</string>
@@ -43,6 +44,7 @@
     <string name="tt_mode_other">Transit</string>
     <string name="tt_now">now</string>
     <string name="tt_in_min">%1$d min</string>
+    <string name="tt_min_unit">min</string>
     <string name="tt_in_h_min">%1$d h %2$d min</string>
     <string name="tt_live">live</string>
 

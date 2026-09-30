@@ -40,10 +40,10 @@ import java.util.Locale
  * stops, so we bring our own stops, which open OsmAnd's usual context menu:
  *
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
- *    has a switch for it). Tapping a stop shows its name, which way it goes, and the next departures as the
- *    menu's detail rows;
- *  - three buttons in that menu: "Next departures" reloads them now, "Full day" opens the rest of today by route
- *    in a sheet over the map ([DaySheetActivity]), "Show in Companion" opens the stop's full timetable in this app;
+ *    has a switch for it). Tapping a stop shows its name, which way it goes, and when that was loaded;
+ *  - three buttons in that menu: "Next departures" opens the live next departures, and "Full day" the rest of
+ *    today by route, each in a sheet over the map ([DaySheetActivity]); "Show in Companion" opens the stop's full
+ *    timetable in this app;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
  *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
@@ -129,9 +129,9 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         shown.clear()
     }
 
-    /** Makes the layer show exactly [stops], each with its next departures in the menu. */
+    /** Makes the layer show exactly [stops]. */
     fun showStops(stops: List<Stop>, now: Long) {
-        val points = stops.map { pointOf(it, departureDetails(it, now)) }
+        val points = stops.map { pointOf(it, details(now)) }
         val ids = points.mapTo(HashSet()) { it.id }
         for (gone in shown.keys - ids) {
             osmand.call("removeMapPoint") { it.removeMapPoint(RemoveMapPointParams(LAYER_ID, gone)) }
@@ -159,19 +159,18 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
      * that was open. OsmAnd shows it once its map is in front. False if OsmAnd didn't take it.
      */
     fun showMenu(stop: Stop, now: Long): Boolean {
-        val point = pointOf(stop, departureDetails(stop, now))
+        val point = pointOf(stop, details(now))
         // Into the layer as well, so the stop is still there once the menu is closed.
         osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(listOf(point)))) }
         shown[point.id] = point
         return osmand.call("showMapPoint") { it.showMapPoint(ShowMapPointParams(LAYER_ID, point)) } == true
     }
 
-    fun departureDetails(stop: Stop, now: Long): List<String> = buildList {
-        val upcoming = stop.departures.filter { it.time >= now - GRACE_MS }
-        if (upcoming.isEmpty()) add(strings.getString(R.string.tt_no_departures))
-        upcoming.forEach { add(TransitFormat.departureLine(strings, it, now)) }
-        add(strings.getString(R.string.tt_updated, TransitFormat.clock(now)))
-    }
+    /**
+     * The menu's detail rows: only when the stop was loaded. Its departures are a tap away, in the Next departures
+     * and Full day sheets, where they have room.
+     */
+    private fun details(now: Long): List<String> = listOf(strings.getString(R.string.tt_updated, TransitFormat.clock(now)))
 
     /** Whether OsmAnd's language is no longer the one everything was registered in. */
     fun languageChanged(): Boolean = osmandLocales()?.let { it != locales } == true

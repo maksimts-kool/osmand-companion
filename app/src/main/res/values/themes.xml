@@ -1,15 +1,9 @@
 <resources>
-    <!-- The stop and trip screens. -->
-    <style name="Theme.Companion" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/brand</item>
-    </style>
-
     <!--
-        The home screen (header, tabs, dialogs) in OsmAnd's colors (colors.xml): white lists, blue for what's
-        active (orange at night, as in OsmAnd), OsmAnd's orange logo. Every color role is set so none of
-        Material's default purple shows through.
+        The stop and trip screens. Everything that's "active" is the logo's blue, so none of Material's default
+        purple shows through (the selected day chip, tonal buttons).
     -->
-    <style name="Theme.Companion.OsmAnd">
+    <style name="Theme.Companion" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/osm_active</item>
         <item name="colorOnPrimary">@color/osm_on_active</item>
         <item name="colorPrimaryContainer">@color/osm_active_tint</item>
@@ -17,13 +11,20 @@
         <item name="colorPrimaryInverse">@color/osm_active_pressed</item>
         <item name="colorSecondary">@color/osm_active</item>
         <item name="colorOnSecondary">@color/osm_on_active</item>
-        <!-- Tonal buttons and the selected tab: OsmAnd's light-blue "active" tint with blue on it. -->
         <item name="colorSecondaryContainer">@color/osm_active_tint</item>
         <item name="colorOnSecondaryContainer">@color/osm_active</item>
-        <item name="colorTertiary">@color/osm_orange</item>
+        <item name="colorTertiary">@color/osm_active</item>
         <item name="colorOnTertiary">@color/osm_on_active</item>
-        <item name="colorTertiaryContainer">@color/osm_inactive_bg</item>
-        <item name="colorOnTertiaryContainer">@color/osm_orange</item>
+        <item name="colorTertiaryContainer">@color/osm_active_tint</item>
+        <item name="colorOnTertiaryContainer">@color/osm_active</item>
+    </style>
+
+    <!--
+        The home screen (header, tabs, dialogs) in OsmAnd's colors (colors.xml): white lists (dark greys at
+        night), and the logo's blue for what's active, from Theme.Companion. Every other color role is set too,
+        so none of Material's default purple shows through.
+    -->
+    <style name="Theme.Companion.OsmAnd">
         <item name="colorError">@color/osm_error</item>
         <item name="colorOnError">@color/osm_on_active</item>
 

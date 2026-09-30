@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One of a route's next departures, in the line under its name; opens that trip. The first says how soon,
+    in the route's color, with a dot when it's live.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="28dp"
+    android:background="@drawable/tt_minute_bg"
+    android:backgroundTint="?attr/colorSurfaceContainerHighest"
+    android:drawablePadding="5dp"
+    android:foreground="@drawable/tt_minute_ripple"
+    android:fontFeatureSettings="tnum"
+    android:gravity="center"
+    android:includeFontPadding="false"
+    android:maxLines="1"
+    android:paddingHorizontal="9dp"
+    android:textAppearance="?attr/textAppearanceLabelLarge"
+    android:textColor="?attr/colorOnSurface"
+    tools:text="17:32" />

@@ -15,6 +15,7 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.animation.doOnEnd
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -22,17 +23,19 @@ import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import dev.maksim.companion.timetable.databinding.TtActivityDaySheetBinding
+import dev.maksim.companion.timetable.databinding.TtItemSheetDepartureBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetRouteBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetTimeBinding
 import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
- * The Full day button in a stop's OsmAnd menu opens this over OsmAnd's map: the rest of today by route, in
- * OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd. (OsmAnd's API can only put text rows in
- * its own menu.) It runs in a task of its own, so closing it goes straight back to OsmAnd rather than to this app.
- * Routes leaving soonest come first. Tapping a time opens that trip, and Full timetable the stop's timetable, in
- * its place ([leaveFor]).
+ * The Next departures and Full day buttons in a stop's OsmAnd menu open this over OsmAnd's map: the stop's next
+ * departures, live where peatus.ee has them, soonest first ([showsNext]); or the rest of today by route, the route
+ * leaving soonest first. It's in OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd.
+ * (OsmAnd's API can only put text rows in its own menu.) It runs in a task of its own, so closing it goes straight
+ * back to OsmAnd rather than to this app. Tapping a departure or a time opens that trip, and Full timetable the
+ * stop's timetable, in its place ([leaveFor]).
  */
 class DaySheetActivity : AppCompatActivity() {
 
@@ -43,6 +46,12 @@ class DaySheetActivity : AppCompatActivity() {
 
     private lateinit var stopId: String
     private var stopName: String? = null
+
+    /** The next departures rather than the rest of today. */
+    private var showsNext = false
+
+    /** What a load brings: the stop, with its next departures when [showsNext], else with [routes]. */
+    private class Loaded(val stop: Stop, val routes: List<RouteDay>?)
 
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
@@ -74,8 +83,9 @@ class DaySheetActivity : AppCompatActivity() {
         setContentView(binding.root)
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
         stopName = intent.getStringExtra(EXTRA_STOP_NAME)
+        showsNext = intent.getBooleanExtra(EXTRA_NEXT, false)
         header(stopName, Mode.of(intent.getStringExtra(EXTRA_MODE)))
-        binding.subtitle.setText(R.string.tt_rest_of_today)
+        binding.subtitle.setText(if (showsNext) R.string.tt_next_departures else R.string.tt_rest_of_today)
 
         val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
         WindowCompat.getInsetsController(window, binding.root).isAppearanceLightNavigationBars = !night
@@ -126,7 +136,7 @@ class DaySheetActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        OpenedScreens.resumed(this, OpenedScreens.Screen.DAY_SHEET, stopId)
+        OpenedScreens.resumed(this, if (showsNext) OpenedScreens.Screen.NEXT_SHEET else OpenedScreens.Screen.DAY_SHEET, stopId)
     }
 
     override fun onDestroy() {
@@ -162,23 +172,79 @@ class DaySheetActivity : AppCompatActivity() {
         binding.progress.isVisible = true
         if (!spin.isStarted) spin.start()
         background.execute {
-            val result = runCatching { peatus.timetable(stopId, Estonia.serviceDate()) ?: throw IOException(unknown) }
+            val result = runCatching {
+                if (showsNext) Loaded(peatus.stopWithin(stopId, NEXT_WITHIN_S, NEXT_DEPARTURES) ?: throw IOException(unknown), null)
+                else peatus.timetable(stopId, Estonia.serviceDate())?.let { (stop, routes) -> Loaded(stop, routes) }
+                    ?: throw IOException(unknown)
+            }
             runOnUiThread { if (id == request && !isDestroyed) show(result, System.currentTimeMillis()) }
         }
     }
 
-    private fun show(result: Result<Pair<Stop, List<RouteDay>>>, now: Long) {
+    private fun show(result: Result<Loaded>, now: Long) {
         binding.progress.isVisible = false
         // Finishes the turn it's on rather than stopping at an angle.
         spin.repeatCount = 0
         binding.content.removeAllViews()
-        val (stop, routes) = result.getOrElse {
+        val loaded = result.getOrElse {
             States.error(binding.content, getString(R.string.tt_load_failed, it.message)) { load() }
             return
         }
+        val stop = loaded.stop
         stopName = stop.name
         header(stop.name, Mode.of(stop.mode))
-        binding.subtitle.text = getString(R.string.tt_sheet_subtitle, TransitFormat.clock(now))
+        val clock = TransitFormat.clock(now)
+        if (loaded.routes == null) {
+            binding.subtitle.text = getString(R.string.tt_sheet_subtitle_next, clock)
+            showNext(stop.departures, now)
+        } else {
+            binding.subtitle.text = getString(R.string.tt_sheet_subtitle, clock)
+            showDay(loaded.routes, now)
+        }
+    }
+
+    private fun showNext(departures: List<Departure>, now: Long) {
+        // Only the soonest few, and only in the next hour: further off, the Full day sheet says it better.
+        val upcoming = departures.filter { it.time >= now - GRACE_MS && it.time < now + NEXT_WITHIN_S * 1000L }
+        upcoming.forEach { addDeparture(it, now) }
+        if (upcoming.isEmpty()) States.empty(binding.content, getString(R.string.tt_no_departures_hour))
+    }
+
+    private fun addDeparture(departure: Departure, now: Long) {
+        val item = TtItemSheetDepartureBinding.inflate(layoutInflater, binding.content, true)
+        val minutes = ((departure.time - now) / 60_000).toInt()
+        val accent = getColor(R.color.tt_osm_accent)
+        // Leaving now: the board lights up.
+        val leaving = minutes < 1
+        item.countdown.backgroundTintList = ColorStateList.valueOf(if (leaving) accent else ColorUtils.setAlphaComponent(accent, 0x1F))
+        item.minutes.setTextColor(if (leaving) getColor(R.color.tt_osm_on_accent) else accent)
+        item.unit.isVisible = !leaving
+        item.minutes.text = if (leaving) getString(R.string.tt_now) else minutes.toString()
+        item.minutes.textSize = if (leaving) BOARD_NOW_TEXT_SP else BOARD_TEXT_SP
+
+        Rows.badge(item.badge, departure.route, departure.mode)
+        item.headsign.text = departure.headsign
+        val delay = (departure.expected - departure.scheduled) / 60
+        item.time.text = listOfNotNull(
+            TransitFormat.clockWithDay(departure.time, now),
+            getString(R.string.tt_live).takeIf { departure.isRealtime },
+            when {
+                !departure.isRealtime -> null
+                delay >= 1 -> getString(R.string.tt_late, delay)
+                delay <= -1 -> getString(R.string.tt_early, -delay)
+                else -> null
+            },
+        ).joinToString(" · ")
+        item.time.setCompoundDrawablesRelativeWithIntrinsicBounds(if (departure.isRealtime) R.drawable.tt_ic_live else 0, 0, 0, 0)
+        item.root.contentDescription = listOfNotNull(
+            departure.route, departure.headsign, TransitFormat.relative(this, departure.time, now), item.time.text,
+        ).joinToString(", ")
+        item.root.setOnClickListener {
+            leaveFor(TripActivity.intent(this, departure.tripId, departure.serviceDay, stopId))
+        }
+    }
+
+    private fun showDay(routes: List<RouteDay>, now: Long) {
         val left = routes.map { route ->
             route to route.times.filter { TransitFormat.serviceTime(route.serviceDay, it.first) >= now - GRACE_MS }
         }.filter { it.second.isNotEmpty() }
@@ -214,6 +280,17 @@ class DaySheetActivity : AppCompatActivity() {
         private const val EXTRA_STOP_NAME = "stop_name"
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_NIGHT = "night"
+        private const val EXTRA_NEXT = "next"
+
+        /**
+         * The Next departures sheet shows those leaving in the next [NEXT_WITHIN_S] seconds, at most
+         * [NEXT_DEPARTURES] of them: at a busy stop, the list ends well before the hour is up.
+         */
+        private const val NEXT_WITHIN_S = 60 * 60
+        private const val NEXT_DEPARTURES = 12
+
+        private const val BOARD_TEXT_SP = 24f
+        private const val BOARD_NOW_TEXT_SP = 16f
 
         /** Of the screen's height. */
         private const val MAX_HEIGHT = 0.75f
@@ -231,14 +308,16 @@ class DaySheetActivity : AppCompatActivity() {
         var locales: LocaleList? = null
 
         /**
-         * Opens the sheet for [stop] in a fresh task of its own, over whatever is in front (OsmAnd). [night] is
-         * whether OsmAnd looks dark right now; null follows the phone.
+         * Opens the sheet for [stop], with its [next] departures or else the rest of today, in a fresh task of its
+         * own, over whatever is in front (OsmAnd). [night] is whether OsmAnd looks dark right now; null follows the
+         * phone.
          */
-        fun intent(context: Context, stop: Stop, night: Boolean?): Intent =
+        fun intent(context: Context, stop: Stop, next: Boolean, night: Boolean?): Intent =
             Intent().setClassName(context.packageName, DaySheetActivity::class.java.name)
                 .putExtra(EXTRA_STOP_ID, stop.id)
                 .putExtra(EXTRA_STOP_NAME, stop.name)
                 .putExtra(EXTRA_MODE, stop.mode)
+                .putExtra(EXTRA_NEXT, next)
                 .apply { if (night != null) putExtra(EXTRA_NIGHT, night) }
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }

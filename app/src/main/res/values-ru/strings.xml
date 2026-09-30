@@ -38,6 +38,9 @@
     <string name="update_button">Обновить до %1$s</string>
     <string name="update_downloading">Загрузка… %1$d%%</string>
     <string name="update_installing">Установка…</string>
+    <string name="update_progress_title">Обновление до %1$s</string>
+    <string name="update_hide">Скрыть</string>
+    <string name="update_failed">Не удалось обновить: %1$s</string>
     <string name="update_dialog_title">Вышла версия %1$s</string>
     <string name="update_installed_version">Сейчас установлена %1$s.</string>
     <string name="update_now">Обновить</string>

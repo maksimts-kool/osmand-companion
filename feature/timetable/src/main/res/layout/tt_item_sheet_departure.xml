@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One departure in the Next departures sheet, like a departure board: how many minutes until it leaves, big,
+    then the route, where it goes, and when; opens that trip.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="8dp">
+
+    <!-- Minutes to go and "min" under them, or "now". -->
+    <LinearLayout
+        android:id="@+id/countdown"
+        android:layout_width="64dp"
+        android:layout_height="56dp"
+        android:background="@drawable/tt_board_bg"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/minutes"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/tt_osm_accent"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            tools:text="6" />
+
+        <TextView
+            android:id="@+id/unit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="@string/tt_min_unit"
+            android:textColor="@color/tt_osm_accent"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/badge"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/tt_badge_bg"
+                android:gravity="center"
+                android:minWidth="32dp"
+                android:paddingHorizontal="6dp"
+                android:textColor="@android:color/white"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="5" />
+
+            <TextView
+                android:id="@+id/headsign"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/tt_osm_text"
+                android:textSize="16sp"
+                tools:text="Metsakooli" />
+        </LinearLayout>
+
+        <!-- The clock time; a dot, "live" and how late when it's from the vehicle rather than the timetable. -->
+        <TextView
+            android:id="@+id/time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:drawablePadding="6dp"
+            android:drawableTint="@color/tt_osm_accent"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/tt_osm_text_secondary"
+            android:textSize="14sp"
+            tools:text="20:14 · live · 2 min late" />
+    </LinearLayout>
+</LinearLayout>

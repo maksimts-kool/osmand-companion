@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 internal object OpenedScreens {
 
-    enum class Screen { STOP, DAY_SHEET }
+    enum class Screen { STOP, DAY_SHEET, NEXT_SHEET }
 
     /** The notification that opens a screen Android didn't let us open directly; one at a time. */
     const val NOTIFICATION_ID = 2

@@ -53,6 +53,9 @@ object Updater {
     var progress: Int? = null
         private set
 
+    /** Why the last update didn't install, until an activity has told the user: see [takeError]. */
+    private var error: String? = null
+
     /** Android's "Do you want to update this app?" screen, waiting for an activity to show it. */
     private var confirmIntent: Intent? = null
 
@@ -131,6 +134,7 @@ object Updater {
     fun install(release: Release) {
         if (progress != null) return
         progress = 0
+        error = null
         notifyListeners()
         AppLog.log("Downloading update ${release.version}")
         background.execute {
@@ -152,6 +156,9 @@ object Updater {
         progress = null
     }
 
+    /** Why the last update failed, once: the next call returns null. */
+    fun takeError(): String? = error.also { error = null }
+
     fun addListener(listener: Listener) = listeners.add(listener)
     fun removeListener(listener: Listener) = listeners.remove(listener)
 
@@ -164,6 +171,7 @@ object Updater {
     internal fun onInstallFinished(error: String?) {
         progress = null
         confirmIntent = null
+        this.error = error
         AppLog.log(if (error == null) "Update installed" else "Update not installed: $error")
         notifyListeners()
     }

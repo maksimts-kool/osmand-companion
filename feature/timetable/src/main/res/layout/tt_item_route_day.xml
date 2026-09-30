@@ -15,16 +15,20 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!--
+            Folded, a route is just this: its number, where it goes, and its next departures in one line, so all
+            the routes fit on screen together. Tapping it unfolds the hours below.
+        -->
         <LinearLayout
             android:id="@+id/header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackground"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
             android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            android:paddingVertical="12dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp">
 
             <TextView
                 android:id="@+id/badge"
@@ -55,6 +59,7 @@
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     tools:text="→ Metsakooli" />
 
+                <!-- The route's full name; only while unfolded, where there's room for it. -->
                 <TextView
                     android:id="@+id/longName"
                     android:layout_width="match_parent"
@@ -64,28 +69,16 @@
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     tools:text="Metsakooli - Männiku" />
+
+                <!-- The next departures (tt_item_next_time), or that it's done for today. -->
+                <dev.maksim.companion.timetable.TimesRow
+                    android:id="@+id/times"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" />
             </LinearLayout>
 
-            <!-- How soon the next one leaves, or that it's done for today; opens the next trip. -->
-            <TextView
-                android:id="@+id/next"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/tt_pill_bg"
-                android:foreground="?attr/selectableItemBackgroundBorderless"
-                android:fontFeatureSettings="tnum"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:minHeight="28dp"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="5dp"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                android:textColor="?attr/colorOnSurface"
-                tools:text="in 7 min" />
-
-            <!-- The dropdown: upcoming hours → whole day → closed → upcoming hours... -->
+            <!-- The dropdown: next departures → upcoming hours → whole day → next departures... -->
             <ImageView
                 android:id="@+id/fold"
                 android:layout_width="24dp"

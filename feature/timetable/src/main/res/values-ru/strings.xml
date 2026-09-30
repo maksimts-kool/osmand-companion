@@ -2,8 +2,8 @@
     <string name="tt_feature_title">Расписания транспорта</string>
     <string name="tt_intro">Расписания всех автобусных, трамвайных, железнодорожных и паромных остановок Эстонии с peatus.ee прямо на карте OsmAnd.</string>
     <string name="tt_show_in_osmand_switch">Показывать расписания в OsmAnd</string>
-    <string name="tt_where_hint">• Карта: нажмите на остановку (масштаб 13+), чтобы увидеть отправления. Скрыть остановки можно в «Настройке карты».\n• Виджет: добавьте «Следующее отправление» в «Настройке экрана».\n• Главное меню → «Расписания транспорта» открывает этот экран.</string>
-    <string name="tt_overlay_hint">Android позволяет кнопкам OsmAnd «Весь день» и «Показать в Companion» открываться прямо поверх OsmAnd, только если этому приложению разрешён показ поверх других приложений. А пока они приходят уведомлением, на которое нужно нажать.</string>
+    <string name="tt_where_hint">• Карта: нажмите на остановку (масштаб 13+), затем «Ближайшие отправления» или «Весь день». Скрыть остановки можно в «Настройке карты».\n• Виджет: добавьте «Следующее отправление» в «Настройке экрана».\n• Главное меню → «Расписания транспорта» открывает этот экран.</string>
+    <string name="tt_overlay_hint">Android позволяет кнопкам OsmAnd «Ближайшие отправления», «Весь день» и «Показать в Companion» открываться прямо поверх OsmAnd, только если этому приложению разрешён показ поверх других приложений. А пока они приходят уведомлением, на которое нужно нажать.</string>
     <string name="tt_overlay_allow">Разрешить</string>
     <string name="tt_search_hint">Найти остановку</string>
     <string name="tt_near_map">Рядом с центром карты OsmAnd</string>
@@ -23,10 +23,11 @@
     <string name="tt_open_tap">Нажмите, чтобы открыть расписание</string>
     <string name="tt_stop_type">Остановка · %1$s</string>
     <string name="tt_stop_towards">%1$s · направление: %2$s</string>
-    <string name="tt_no_departures">Нет отправлений в ближайшие 24 часа</string>
     <string name="tt_no_departures_day">В этот день отсюда ничего не отправляется</string>
+    <string name="tt_no_departures_hour">В ближайший час отправлений нет</string>
     <string name="tt_no_more_today">Сегодня отправлений больше нет</string>
     <string name="tt_sheet_subtitle">До конца дня · обновлено %1$s</string>
+    <string name="tt_sheet_subtitle_next">Ближайшие · обновлено %1$s</string>
     <string name="tt_rest_of_today">До конца дня</string>
     <string name="tt_refresh">Обновить</string>
     <string name="tt_full_timetable">Полное расписание</string>
@@ -43,6 +44,7 @@
     <string name="tt_mode_other">Транспорт</string>
     <string name="tt_now">сейчас</string>
     <string name="tt_in_min">%1$d мин</string>
+    <string name="tt_min_unit">мин</string>
     <string name="tt_in_h_min">%1$d ч %2$d мин</string>
     <string name="tt_live">онлайн</string>
 

@@ -188,12 +188,8 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             try {
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId)
-                    OsmAndStopUi.BUTTON_FULL_DAY -> showFullDay(stopId, now)
-                    OsmAndStopUi.BUTTON_DEPARTURES -> {
-                        val stop = peatus.stop(stopId, MENU_DEPARTURES) ?: return@post
-                        nearbyStops = nearbyStops.map { if (it.id == stopId) stop.copy(departures = stop.departures.take(DEPARTURES)) else it }
-                        ui.showInMenu(stop, ui.departureDetails(stop, now))
-                    }
+                    OsmAndStopUi.BUTTON_FULL_DAY -> showSheet(stopId, now, next = false)
+                    OsmAndStopUi.BUTTON_DEPARTURES -> showSheet(stopId, now, next = true)
                 }
             } catch (e: IOException) {
                 val stop = nearbyStops.find { it.id == stopId } ?: return@post
@@ -209,11 +205,15 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         open(StopActivity.intent(context, stopId, name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), name, OpenedScreens.Screen.STOP, stopId)
     }
 
-    /** Opens the rest of today at the stop in a sheet over OsmAnd's map, dark when OsmAnd is. */
-    private fun showFullDay(stopId: String, now: Long) {
+    /**
+     * Opens the stop's [next] departures, or else the rest of today, in a sheet over OsmAnd's map, dark when
+     * OsmAnd is.
+     */
+    private fun showSheet(stopId: String, now: Long, next: Boolean) {
         val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
         DaySheetActivity.locales = ui.locales
-        open(DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now)), stop.name, OpenedScreens.Screen.DAY_SHEET, stopId)
+        val screen = if (next) OpenedScreens.Screen.NEXT_SHEET else OpenedScreens.Screen.DAY_SHEET
+        open(DaySheetActivity.intent(context, stop, next, ui.isNight(stop.lat, stop.lon, now)), stop.name, screen, stopId)
     }
 
     /**
@@ -284,8 +284,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         const val REFETCH_DISTANCE_M = 400.0
         const val MAX_STOPS = 150
 
-        /** Departures per stop in the map's menus; more when you tap Next departures. */
+        /** Departures per stop, for the widget and to tell which way a stop goes. */
         const val DEPARTURES = 5
-        const val MENU_DEPARTURES = 10
     }
 }

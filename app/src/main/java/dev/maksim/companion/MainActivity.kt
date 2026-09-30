@@ -22,6 +22,7 @@ import com.google.android.material.tabs.TabLayout
 import dev.maksim.companion.core.CompanionService
 import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.databinding.ActivityMainBinding
+import dev.maksim.companion.databinding.DialogUpdateProgressBinding
 import dev.maksim.companion.timetable.OsmAndStopUi
 import dev.maksim.companion.timetable.TimetableFragment
 import dev.maksim.companion.update.Release
@@ -35,6 +36,13 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     private val app get() = application as CompanionApp
 
     private var updateDialog: AlertDialog? = null
+
+    /** Follows a running update; see [showProgress]. */
+    private var progressDialog: AlertDialog? = null
+    private var progressBinding: DialogUpdateProgressBinding? = null
+
+    /** Hide was tapped for the running update: the header's button follows it, and brings the popup back. */
+    private var progressHidden = false
 
     /** Opened from the "update available" notification: show the dialog even if it was shown before. */
     private var updateRequested = false
@@ -57,7 +65,14 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
                 onConnectionChanged(app.osmand.isConnected)
             }
             openOsmandButton.setOnClickListener { openOsmand() }
-            updateButton.setOnClickListener { Updater.available?.let { showUpdateDialog(it) } }
+            updateButton.setOnClickListener {
+                if (Updater.progress != null) {
+                    progressHidden = false
+                    onUpdateChanged()
+                } else {
+                    Updater.available?.let { showUpdateDialog(it) }
+                }
+            }
             tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
                 override fun onTabSelected(tab: TabLayout.Tab) = showTab(TAB_IDS[tab.position])
                 override fun onTabUnselected(tab: TabLayout.Tab) {}
@@ -104,6 +119,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
 
     override fun onDestroy() {
         updateDialog?.dismiss()
+        progressDialog?.dismiss()
         super.onDestroy()
     }
 
@@ -125,14 +141,17 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
         }
     }
 
-    /** The header's update button follows the download; a new version pops up the dialog once. */
+    /**
+     * The header's update button and a popup ([showProgress]) follow the download; a new version pops up the
+     * dialog once.
+     */
     override fun onUpdateChanged() {
         Updater.takeConfirmIntent()?.let { startActivity(it) }
         val release = Updater.available
         val progress = Updater.progress
+        showProgress(release, progress)
         with(binding.updateButton) {
             isVisible = release != null
-            isEnabled = progress == null
             text = when {
                 release == null -> null
                 progress == null -> getString(R.string.update_button, release.version)
@@ -144,6 +163,38 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             updateRequested = false
             showUpdateDialog(release)
         }
+    }
+
+    /**
+     * While an update downloads and installs, a popup with an animation and a progress bar, so it's clear that
+     * something is happening. Hide leaves it to the header's button. It goes away when the update is done or
+     * failed (with a message saying why), or when Android asks the user to confirm the install.
+     */
+    private fun showProgress(release: Release?, progress: Int?) {
+        if (release == null || progress == null) {
+            progressDialog?.dismiss()
+            progressDialog = null
+            progressBinding = null
+            progressHidden = false
+            Updater.takeError()?.let { Toast.makeText(this, getString(R.string.update_failed, it), Toast.LENGTH_LONG).show() }
+            return
+        }
+        if (progressHidden) return
+        val view = progressBinding ?: DialogUpdateProgressBinding.inflate(layoutInflater).also { progressBinding = it }
+        if (progressDialog?.isShowing != true) {
+            progressDialog = MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.update_progress_title, release.version))
+                .setView(view.root)
+                .setCancelable(false)
+                .setNegativeButton(R.string.update_hide) { _, _ ->
+                    progressHidden = true
+                    progressDialog = null
+                    progressBinding = null
+                }
+                .show()
+        }
+        view.progress.setProgressCompat(progress, true)
+        view.status.text = if (progress >= 100) getString(R.string.update_installing) else getString(R.string.update_downloading, progress)
     }
 
     fun showUpdateDialog(release: Release) {

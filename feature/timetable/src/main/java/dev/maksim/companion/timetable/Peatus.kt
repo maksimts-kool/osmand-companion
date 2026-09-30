@@ -116,6 +116,20 @@ class PeatusClient {
         return data.optJSONObject("stop")?.let { stopOf(it, departures) }
     }
 
+    /**
+     * One stop with its departures in the next [seconds] (going by the timetable), the soonest [max] of them; null
+     * if peatus.ee doesn't know it. By default every one, however many: a count alone would cut a busy stop's hour
+     * short, as some have 40 an hour.
+     */
+    fun stopWithin(id: String, seconds: Int, max: Int = ALL_DEPARTURES): Stop? {
+        val query = """
+            query(${'$'}id: String!, ${'$'}range: Int!, ${'$'}n: Int!) { stop(id: ${'$'}id) { $STOP $WITHIN } }
+        """
+        val n = if (max >= ALL_DEPARTURES) ALL_DEPARTURES else max + EXTRA_FOR_ARRIVALS
+        val data = request(query, JSONObject().put("id", id).put("range", seconds).put("n", n))
+        return data.optJSONObject("stop")?.let { stopOf(it, max) }
+    }
+
     /** Stops whose name contains [name], in Estonia and still served. */
     fun searchStops(name: String, max: Int): List<Stop> {
         val query = """
@@ -371,10 +385,17 @@ class PeatusClient {
         /** What [modeOf] needs to know about a route. */
         private const val ROUTE = "gtfsId shortName mode color"
         private const val STOP = "gtfsId name code lat lon vehicleMode routes { $ROUTE }"
-        private const val NEXT = "stoptimesWithoutPatterns(numberOfDepartures: \$n, omitNonPickups: true) {" +
-            " scheduledDeparture realtimeDeparture realtime serviceDay headsign" +
+        private const val DEPARTURE = "scheduledDeparture realtimeDeparture realtime serviceDay headsign" +
             " trip { gtfsId tripHeadsign route { $ROUTE }" +
-            " departureStoptime { scheduledDeparture stop { gtfsId name } } arrivalStoptime { stop { gtfsId name } } } }"
+            " departureStoptime { scheduledDeparture stop { gtfsId name } } arrivalStoptime { stop { gtfsId name } } }"
+        private const val NEXT = "stoptimesWithoutPatterns(numberOfDepartures: \$n, omitNonPickups: true) { $DEPARTURE }"
+
+        /** At most \$n departures in the next \$range seconds; without a count, peatus.ee gives 5. */
+        private const val WITHIN =
+            "stoptimesWithoutPatterns(timeRange: \$range, numberOfDepartures: \$n, omitNonPickups: true) { $DEPARTURE }"
+
+        /** For [stopWithin]: as many as there are. */
+        const val ALL_DEPARTURES = 1000
     }
 }
 
