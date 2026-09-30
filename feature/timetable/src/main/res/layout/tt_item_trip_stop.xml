@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One stop of a trip: time, its piece of the line diagram, name, and how soon. Opens the stop. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -53,20 +54,41 @@
             tools:visibility="visible" />
     </LinearLayout>
 
-    <TextView
+    <!-- How soon; green, with the animated live mark, when it's the vehicle's own time. -->
+    <LinearLayout
         android:id="@+id/eta"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:background="@drawable/tt_pill_bg"
-        android:fontFeatureSettings="tnum"
-        android:gravity="center"
-        android:includeFontPadding="false"
-        android:maxLines="1"
+        android:gravity="center_vertical"
         android:minHeight="26dp"
+        android:orientation="horizontal"
         android:paddingHorizontal="10dp"
-        android:paddingVertical="4dp"
-        android:textAppearance="?attr/textAppearanceLabelMedium"
-        android:textColor="?attr/colorOnSurface"
-        tools:text="11 min" />
+        android:paddingVertical="4dp">
+
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/live"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="4dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            app:lottie_autoPlay="true"
+            app:lottie_loop="true"
+            app:lottie_rawRes="@raw/tt_anim_live"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/etaText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSurface"
+            tools:text="11 min" />
+    </LinearLayout>
 </LinearLayout>

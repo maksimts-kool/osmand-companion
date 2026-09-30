@@ -31,8 +31,8 @@ import java.util.concurrent.Executors
 
 /**
  * The Next departures and Full day buttons in a stop's OsmAnd menu open this over OsmAnd's map: the stop's next
- * departures, live where peatus.ee has them, soonest first ([showsNext]); or the rest of today by route, the route
- * leaving soonest first. It's in OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd.
+ * departures, live where there are live times ([PeatusClient.stopWithin]), soonest first ([showsNext]); or the
+ * rest of today by route, the route leaving soonest first. It's in OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd.
  * (OsmAnd's API can only put text rows in its own menu.) It runs in a task of its own, so closing it goes straight
  * back to OsmAnd rather than to this app. Tapping a departure or a time opens that trip, and Full timetable the
  * stop's timetable, in its place ([leaveFor]).
@@ -50,8 +50,11 @@ class DaySheetActivity : AppCompatActivity() {
     /** The next departures rather than the rest of today. */
     private var showsNext = false
 
-    /** What a load brings: the stop, with its next departures when [showsNext], else with [routes]. */
-    private class Loaded(val stop: Stop, val routes: List<RouteDay>?)
+    /**
+     * What a load brings: the stop, with its next departures when [showsNext], else with [routes] and the next
+     * hour's departures, for their [live] times.
+     */
+    private class Loaded(val stop: Stop, val routes: List<RouteDay>?, val live: List<Departure> = emptyList())
 
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
@@ -128,10 +131,24 @@ class DaySheetActivity : AppCompatActivity() {
         binding.fullTimetable.setOnClickListener { leaveFor(StopActivity.intent(this, stopId, stopName)) }
     }
 
+    /** Keeps the times, live ones above all, fresh while the sheet is open. */
+    private val refresh = object : Runnable {
+        override fun run() {
+            load()
+            binding.root.postDelayed(this, REFRESH_MS)
+        }
+    }
+
     /** Also on turning the screen back on, so "in 6 min" is right. */
     override fun onStart() {
         super.onStart()
         load()
+        binding.root.postDelayed(refresh, REFRESH_MS)
+    }
+
+    override fun onStop() {
+        binding.root.removeCallbacks(refresh)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -174,8 +191,10 @@ class DaySheetActivity : AppCompatActivity() {
         background.execute {
             val result = runCatching {
                 if (showsNext) Loaded(peatus.stopWithin(stopId, NEXT_WITHIN_S, NEXT_DEPARTURES) ?: throw IOException(unknown), null)
-                else peatus.timetable(stopId, Estonia.serviceDate())?.let { (stop, routes) -> Loaded(stop, routes) }
-                    ?: throw IOException(unknown)
+                else peatus.timetable(stopId, Estonia.serviceDate())?.let { (stop, routes) ->
+                    val next = runCatching { peatus.stopWithin(stopId, NEXT_WITHIN_S)?.departures }.getOrNull()
+                    Loaded(stop, routes, next.orEmpty())
+                } ?: throw IOException(unknown)
             }
             runOnUiThread { if (id == request && !isDestroyed) show(result, System.currentTimeMillis()) }
         }
@@ -199,7 +218,7 @@ class DaySheetActivity : AppCompatActivity() {
             showNext(stop.departures, now)
         } else {
             binding.subtitle.text = getString(R.string.tt_sheet_subtitle, clock)
-            showDay(loaded.routes, now)
+            showDay(loaded.routes, loaded.live, now)
         }
     }
 
@@ -213,7 +232,8 @@ class DaySheetActivity : AppCompatActivity() {
     private fun addDeparture(departure: Departure, now: Long) {
         val item = TtItemSheetDepartureBinding.inflate(layoutInflater, binding.content, true)
         val minutes = ((departure.time - now) / 60_000).toInt()
-        val accent = getColor(R.color.tt_osm_accent)
+        // Green when it's the vehicle's own time rather than the timetable's.
+        val accent = getColor(if (departure.isRealtime) R.color.tt_live else R.color.tt_osm_accent)
         // Leaving now: the board lights up.
         val leaving = minutes < 1
         item.countdown.backgroundTintList = ColorStateList.valueOf(if (leaving) accent else ColorUtils.setAlphaComponent(accent, 0x1F))
@@ -221,6 +241,7 @@ class DaySheetActivity : AppCompatActivity() {
         item.unit.isVisible = !leaving
         item.minutes.text = if (leaving) getString(R.string.tt_now) else minutes.toString()
         item.minutes.textSize = if (leaving) BOARD_NOW_TEXT_SP else BOARD_TEXT_SP
+        item.unit.setTextColor(accent)
 
         Rows.badge(item.badge, departure.route, departure.mode)
         item.headsign.text = departure.headsign
@@ -235,7 +256,7 @@ class DaySheetActivity : AppCompatActivity() {
                 else -> null
             },
         ).joinToString(" · ")
-        item.time.setCompoundDrawablesRelativeWithIntrinsicBounds(if (departure.isRealtime) R.drawable.tt_ic_live else 0, 0, 0, 0)
+        Rows.liveMark(item.live, departure.isRealtime, accent)
         item.root.contentDescription = listOfNotNull(
             departure.route, departure.headsign, TransitFormat.relative(this, departure.time, now), item.time.text,
         ).joinToString(", ")
@@ -244,33 +265,48 @@ class DaySheetActivity : AppCompatActivity() {
         }
     }
 
-    private fun showDay(routes: List<RouteDay>, now: Long) {
+    /** One of a route's times left today: when it leaves, live if [isRealtime]. */
+    private class Time(val tripId: String, val time: Long, val isRealtime: Boolean)
+
+    /** The times left, each at its live time if it's among the [live] next departures, as they leave. */
+    private fun showDay(routes: List<RouteDay>, live: List<Departure>, now: Long) {
+        val byTrip = live.filter { it.isRealtime }.associateBy { it.serviceDay to it.tripId }
         val left = routes.map { route ->
-            route to route.times.filter { TransitFormat.serviceTime(route.serviceDay, it.first) >= now - GRACE_MS }
+            route to route.times.map { (seconds, tripId) ->
+                val departure = byTrip[route.serviceDay to tripId]
+                Time(tripId, departure?.time ?: TransitFormat.serviceTime(route.serviceDay, seconds), departure != null)
+            }.filter { it.time >= now - GRACE_MS }.sortedBy { it.time }
         }.filter { it.second.isNotEmpty() }
-        left.sortedBy { (route, times) -> TransitFormat.serviceTime(route.serviceDay, times.first().first) }
+        left.sortedBy { (_, times) -> times.first().time }
             .forEach { (route, times) -> addRoute(route, times, now) }
         if (left.isEmpty()) States.empty(binding.content, getString(R.string.tt_no_more_today))
     }
 
-    private fun addRoute(route: RouteDay, left: List<Pair<Int, String>>, now: Long) {
+    private fun addRoute(route: RouteDay, left: List<Time>, now: Long) {
         val item = TtItemSheetRouteBinding.inflate(layoutInflater, binding.content, true)
         Rows.badge(item.badge, route.route, route.mode)
         item.headsign.text = getString(R.string.tt_towards, route.headsign)
-        val soon = TransitFormat.relative(this, TransitFormat.serviceTime(route.serviceDay, left.first().first), now)
+        val soon = TransitFormat.relative(this, left.first().time, now)
         item.next.text = if (soon == getString(R.string.tt_now)) soon else getString(R.string.tt_next_in, soon)
         item.next.isVisible = soon != null
+        if (left.first().isRealtime) item.next.setTextColor(getColor(R.color.tt_live))
 
-        val accent = ColorStateList.valueOf(getColor(R.color.tt_osm_accent))
-        left.forEachIndexed { i, (seconds, tripId) ->
+        // Green for the live ones, like the Next departures sheet.
+        left.forEachIndexed { i, time ->
             TtItemSheetTimeBinding.inflate(layoutInflater, item.times, true).root.run {
-                text = TransitFormat.clock(TransitFormat.serviceTime(route.serviceDay, seconds))
+                val accent = getColor(if (time.isRealtime) R.color.tt_live else R.color.tt_osm_accent)
+                text = TransitFormat.clock(time.time)
+                if (time.isRealtime) contentDescription = "$text, ${getString(R.string.tt_live)}"
                 if (i == 0) {
-                    backgroundTintList = accent
+                    backgroundTintList = ColorStateList.valueOf(accent)
                     setTextColor(getColor(R.color.tt_osm_on_accent))
                     setTypeface(typeface, Typeface.BOLD)
+                } else if (time.isRealtime) {
+                    setTextColor(accent)
                 }
-                setOnClickListener { leaveFor(TripActivity.intent(this@DaySheetActivity, tripId, route.serviceDay, stopId)) }
+                setOnClickListener {
+                    leaveFor(TripActivity.intent(this@DaySheetActivity, time.tripId, route.serviceDay, stopId))
+                }
             }
         }
     }
@@ -299,6 +335,9 @@ class DaySheetActivity : AppCompatActivity() {
         private const val GRACE_MS = 30_000L
 
         private const val SPIN_MS = 800L
+
+        /** How often the sheet loads again by itself. */
+        private const val REFRESH_MS = 30_000L
 
         /**
          * OsmAnd's language, for the sheets opened from now on; null is this app's. Not an intent extra: the

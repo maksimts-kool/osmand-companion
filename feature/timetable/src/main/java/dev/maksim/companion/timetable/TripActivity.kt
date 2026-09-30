@@ -22,8 +22,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 /**
- * One run of a route: every stop it calls at and when, the route's timetable seen from the vehicle. The header's
- * route button draws it on OsmAnd's map ([showRoute]), after warning if OsmAnd's own version of it is out of date.
+ * One run of a route: every stop it calls at and when, the route's timetable seen from the vehicle; live, in
+ * green, where the vehicle gives its times ([PeatusClient.live]). The header's route button draws it on OsmAnd's
+ * map ([showRoute]), after warning if OsmAnd's own version of it is out of date.
  */
 class TripActivity : AppCompatActivity() {
 
@@ -31,6 +32,9 @@ class TripActivity : AppCompatActivity() {
     private val peatus = PeatusClient()
     private val osmCheck = OsmRouteCheck()
     private val background = Executors.newSingleThreadExecutor()
+
+    /** As peatus.ee has it; [trip] is the same with the live times, refreshed while the screen is open. */
+    private var timetable: Trip? = null
     private var trip: Trip? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,11 +53,25 @@ class TripActivity : AppCompatActivity() {
         load()
     }
 
-    /** Moves the vehicle along while the screen is open; the times themselves don't change. */
+    /** Moves the vehicle along while the screen is open, with fresh live times if there are any. */
     private val tick = object : Runnable {
         override fun run() {
             render(scrollToFrom = false)
+            refreshLive()
             binding.root.postDelayed(this, TICK_MS)
+        }
+    }
+
+    private fun refreshLive() {
+        val timetable = timetable ?: return
+        if (!TallinnLive.covers(timetable.routeId)) return
+        background.execute {
+            val live = runCatching { peatus.live(timetable) }.getOrNull() ?: return@execute
+            runOnUiThread {
+                if (isDestroyed || this.timetable !== timetable) return@runOnUiThread
+                trip = live
+                render(scrollToFrom = false)
+            }
         }
     }
 
@@ -81,27 +99,35 @@ class TripActivity : AppCompatActivity() {
         val unknown = getString(R.string.tt_trip_unknown)
         binding.progress.isVisible = true
         background.execute {
-            val result = runCatching { peatus.trip(tripId, date) ?: throw IOException(unknown) }
+            val result = runCatching {
+                val trip = peatus.trip(tripId, date) ?: throw IOException(unknown)
+                trip to runCatching { peatus.live(trip) }.getOrDefault(trip)
+            }
             runOnUiThread { if (!isDestroyed) show(result) }
         }
     }
 
-    private fun show(result: Result<Trip>) {
+    private fun show(result: Result<Pair<Trip, Trip>>) {
         binding.progress.isVisible = false
-        trip = result.getOrElse {
+        val (timetable, trip) = result.getOrElse {
             States.error(binding.content, getString(R.string.tt_load_failed, it.message)) {
                 States.loading(binding.content, MaterialColors.getColor(binding.content, androidx.appcompat.R.attr.colorPrimary))
                 load()
             }
             return
         }
+        this.timetable = timetable
+        this.trip = trip
         binding.header.action.isVisible = true
         binding.content.alpha = 0f
         binding.content.animate().alpha(1f).setDuration(FADE_MS).start()
         render(scrollToFrom = true)
     }
 
-    /** Draws the trip as a line diagram, with the vehicle where the timetable says it is now. */
+    /**
+     * Draws the trip as a line diagram, with the vehicle where it is now: between the last stop the city's feed
+     * no longer expects it at and the next, when there are live times, else where the timetable says.
+     */
     private fun render(scrollToFrom: Boolean) {
         val trip = trip ?: return
         val mode = Mode.of(trip.mode)
@@ -115,15 +141,18 @@ class TripActivity : AppCompatActivity() {
         content.overlay.clear()
         val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
         // The vehicle is between the last stop it has passed and the next; -1 before it sets off.
-        val last = times.indexOfLast { it <= now }
+        val last = if (trip.liveFrom >= 0) trip.liveFrom - 1 else times.indexOfLast { it <= now }
         val between = last >= 0 && last < times.lastIndex
-        val progress = if (between) (now - times[last]).toFloat() / max(1L, times[last + 1] - times[last]) else 0f
+        val progress = if (!between) 0f
+        else ((now - times[last]).toFloat() / max(1L, times[last + 1] - times[last])).coerceIn(0f, 1f)
+        val live = getColor(R.color.tt_live)
         var fromRow: View? = null
         for ((i, tripStop) in trip.stops.withIndex()) {
             val time = times[i]
             val passed = i <= last
             val row = TtItemTripStopBinding.inflate(layoutInflater, content, true)
             row.time.text = TransitFormat.clock(time)
+            if (tripStop.isRealtime) row.time.setTextColor(live)
             row.name.text = tripStop.stop.name
             with(row.line) {
                 setMode(mode)
@@ -166,10 +195,15 @@ class TripActivity : AppCompatActivity() {
             row.status.text = status.joinToString(" · ")
             row.status.isVisible = status.isNotEmpty()
 
-            val soon = TransitFormat.relative(this, time, now)?.takeIf { time >= now }
-            row.eta.text = soon
+            // Only the stops still ahead; ahead of a late vehicle too, though their time has passed.
+            val soon = TransitFormat.relative(this, time, now)?.takeIf { !passed && (time >= now || trip.liveFrom >= 0) }
+            row.etaText.text = soon
             row.eta.isVisible = soon != null
-            row.eta.backgroundTintList = color.withAlpha(if (i == last + 1) 0x40 else 0x1A)
+            row.eta.backgroundTintList =
+                if (tripStop.isRealtime) ColorStateList.valueOf(live).withAlpha(if (i == last + 1) 0x40 else 0x1F)
+                else color.withAlpha(if (i == last + 1) 0x40 else 0x1A)
+            if (tripStop.isRealtime) row.etaText.setTextColor(live)
+            Rows.liveMark(row.live, tripStop.isRealtime && soon != null, live)
             if (passed) {
                 row.time.alpha = PAST_ALPHA
                 row.name.alpha = PAST_ALPHA

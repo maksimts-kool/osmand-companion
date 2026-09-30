@@ -43,8 +43,13 @@ data class Departure(
     val serviceDay: Long,
     val scheduled: Int,
     val expected: Int,
-    /** Whether [expected] comes from a vehicle's live position rather than the timetable. */
+    /**
+     * Whether [expected] comes from a vehicle's live position rather than the timetable: peatus.ee's, or for
+     * Tallinn's city lines the city's own ([TallinnLive]).
+     */
     val isRealtime: Boolean,
+    /** When the trip leaves its first stop, seconds from [serviceDay]; null if peatus.ee doesn't say. */
+    val tripStart: Int? = null,
 ) {
     val time: Long get() = (serviceDay + expected) * 1000
 }
@@ -62,12 +67,19 @@ data class RouteDay(
 
 data class Trip(
     val id: String,
+    /** The route's GTFS id, e.g. "estonia:tallinna-lin_bus_41-1". */
+    val routeId: String,
     val route: String,
     val mode: String,
     val headsign: String,
     val longName: String,
     val serviceDay: Long,
     val stops: List<TripStop>,
+    /**
+     * With live times ([PeatusClient.live]): the first of [stops] the vehicle hasn't left yet, as far as the
+     * city's feed knows; -1 without, when only the times say where it is.
+     */
+    val liveFrom: Int = -1,
 )
 
 data class LatLon(val lat: Double, val lon: Double)
@@ -79,12 +91,14 @@ data class TripStop(val stop: Stop, val scheduled: Int, val expected: Int, val i
 /**
  * Client for peatus.ee, the Estonian Transport Administration's journey planner. It runs OpenTripPlanner
  * on the national GTFS feed (every bus, tram, train and ferry in Estonia), so one GraphQL endpoint answers
- * "which stops are here", "what leaves next" (with live times where the operator provides them, e.g. Tallinn)
- * and "what's the whole timetable".
+ * "which stops are here", "what leaves next" and "what's the whole timetable". Its live times are only where
+ * operators send them; Tallinn's city buses, trolleybuses and trams get theirs from the city ([TallinnLive]) instead.
  *
  * Blocking: call it off the main thread.
  */
 class PeatusClient {
+
+    private val tallinn = TallinnLive()
 
     /** Stops within [radius] m, nearest first, each with its next [departures] departures. */
     fun nearbyStops(lat: Double, lon: Double, radius: Int, max: Int, departures: Int): List<Stop> {
@@ -110,10 +124,12 @@ class PeatusClient {
     /** One stop with its next [departures] departures, or null if peatus.ee doesn't know it. */
     fun stop(id: String, departures: Int): Stop? {
         val query = """
-            query(${'$'}id: String!, ${'$'}n: Int!) { stop(id: ${'$'}id) { $STOP $NEXT } }
+            query(${'$'}id: String!, ${'$'}n: Int!, ${'$'}start: Long!, ${'$'}late: Int!) {
+              stop(id: ${'$'}id) { $STOP $NEXT $LATE }
+            }
         """
-        val data = request(query, JSONObject().put("id", id).put("n", departures + EXTRA_FOR_ARRIVALS))
-        return data.optJSONObject("stop")?.let { stopOf(it, departures) }
+        val data = request(query, lateVariables().put("id", id).put("n", departures + EXTRA_FOR_ARRIVALS))
+        return data.optJSONObject("stop")?.let { withLive(it, departures) }
     }
 
     /**
@@ -123,11 +139,13 @@ class PeatusClient {
      */
     fun stopWithin(id: String, seconds: Int, max: Int = ALL_DEPARTURES): Stop? {
         val query = """
-            query(${'$'}id: String!, ${'$'}range: Int!, ${'$'}n: Int!) { stop(id: ${'$'}id) { $STOP $WITHIN } }
+            query(${'$'}id: String!, ${'$'}range: Int!, ${'$'}n: Int!, ${'$'}start: Long!, ${'$'}late: Int!) {
+              stop(id: ${'$'}id) { $STOP $WITHIN $LATE }
+            }
         """
         val n = if (max >= ALL_DEPARTURES) ALL_DEPARTURES else max + EXTRA_FOR_ARRIVALS
-        val data = request(query, JSONObject().put("id", id).put("range", seconds).put("n", n))
-        return data.optJSONObject("stop")?.let { stopOf(it, max) }
+        val data = request(query, lateVariables().put("id", id).put("range", seconds).put("n", n))
+        return data.optJSONObject("stop")?.let { withLive(it, max) }
     }
 
     /** Stops whose name contains [name], in Estonia and still served. */
@@ -216,6 +234,7 @@ class PeatusClient {
         val stopName = { time: JSONObject? -> time?.getJSONObject("stop")?.getString("name") }
         return Trip(
             id = json.getString("gtfsId"),
+            routeId = route.getString("gtfsId"),
             route = route.getString("shortName"),
             mode = modeOf(route),
             headsign = destination(
@@ -232,6 +251,51 @@ class PeatusClient {
                 )
             },
         )
+    }
+
+    /**
+     * [trip] at the times its vehicle gives, for a Tallinn city line ([TallinnLive]); as it is for any other, or
+     * when the city's feed doesn't answer. The feed is per stop, so it's asked about each stop the vehicle may be
+     * at or near: from [LATE_S] behind the timetable to [TRIP_AHEAD_S] ahead of it. The feed forgets a stop once
+     * the vehicle has left it, so the stops before the first one it still lists the trip at are behind the vehicle
+     * ([Trip.liveFrom]). Until it has left the first, the trip isn't on its way, and whatever the feed says of it
+     * is its vehicle's guess from the trip before: it's the timetable until then. The vehicle's delay is the same
+     * at all the stops ahead of it, so if one stop says the trip has a vehicle ([TallinnLive.Times.isLive]), every
+     * stop that lists it has its live time, on time too. Those after, that the feed says nothing about, get the
+     * delay of the one before.
+     */
+    fun live(trip: Trip): Trip {
+        if (!TallinnLive.covers(trip.routeId)) return trip
+        val now = System.currentTimeMillis() / 1000
+        val near = trip.stops.filter { trip.serviceDay + it.scheduled in now - LATE_S..now + TRIP_AHEAD_S }
+        if (near.isEmpty()) return trip
+        val feed = tallinn.departures(near.map { it.stop }.distinctBy { it.id })
+        val listed = trip.stops.map {
+            feed[it.stop.id]?.find(trip.route, trip.mode, trip.headsign, trip.serviceDay + it.scheduled)
+        }
+        val first = listed.indexOfFirst { it != null }
+        // Still at its first stop, or not due to leave it yet.
+        if (first <= 0 || trip.serviceDay + trip.stops.first().scheduled > now) return trip
+        val hasVehicle = trip.stops.indices.any { i ->
+            listed[i]?.let { feed.getValue(trip.stops[i].stop.id).isLive(it, started = true) } == true
+        }
+        if (!hasVehicle) return trip
+        var delay = 0
+        val stops = trip.stops.mapIndexed { i, stop ->
+            val time = listed[i]
+            when {
+                time != null -> {
+                    val scheduled = (time.scheduled - trip.serviceDay).toInt()
+                    val expected = (time.expected - trip.serviceDay).toInt()
+                    delay = expected - scheduled
+                    // The city's timetable is to the second, so how late it is comes out right.
+                    stop.copy(scheduled = scheduled, expected = expected, isRealtime = true)
+                }
+                i < first -> stop
+                else -> stop.copy(expected = stop.scheduled + delay)
+            }
+        }
+        return trip.copy(stops = stops, liveFrom = first)
     }
 
     /**
@@ -264,12 +328,55 @@ class PeatusClient {
             mode = kind?.takeIf { vehicleMode == "BUS" && (it == TROLLEYBUS || it == REGIONAL) } ?: vehicleMode,
             lines = routes.map { Line(it.getString("shortName"), modeOf(it)) }.distinctBy { it.name }
                 .sortedWith(compareBy(RouteOrder) { it.name }),
-            departures = json.optJSONArray("stoptimesWithoutPatterns")?.objects().orEmpty()
-                .filterNot { isArrival(json.getString("gtfsId"), name, it) }
-                .map(::departureOf)
-                .take(departures),
+            departures = departuresOf(json, "stoptimesWithoutPatterns").take(departures),
         )
     }
+
+    /** The departures in the stop's [field], but for the ends of lines. */
+    private fun departuresOf(json: JSONObject, field: String): List<Departure> =
+        json.optJSONArray(field)?.objects().orEmpty()
+            .filterNot { isArrival(json.getString("gtfsId"), json.getString("name"), it) }
+            .map(::departureOf)
+
+    /**
+     * The stop in [json] with its next [max] departures, those of Tallinn's city lines at the times their
+     * vehicles give ([TallinnLive]), which peatus.ee doesn't have. It only knows the timetable, so one that's
+     * running late has gone from its next departures by now: that's what the [LATE] ones are for. Without the
+     * city's feed, the timetable it is.
+     */
+    private fun withLive(json: JSONObject, max: Int): Stop {
+        val stop = stopOf(json, max)
+        val routes = json.optJSONArray("routes")?.objects().orEmpty()
+        if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) return stop
+        val live = runCatching { tallinn.departures(stop) }.getOrNull() ?: return stop
+        val now = System.currentTimeMillis()
+        val departures = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns"))
+            .distinctBy { it.serviceDay to it.tripId }
+            .map { departure ->
+                if (departure.isRealtime) return@map departure
+                val serviceDay = departure.serviceDay
+                val time = live.find(departure.route, departure.mode, departure.headsign, serviceDay + departure.scheduled)
+                    ?: return@map departure
+                // Only once the trip is on its way: before, the feed's times for it are its vehicle's guess from the
+                // trip before. It left its first stop when that was due, as late as the feed has it here.
+                val delay = time.expected - time.scheduled
+                val started = departure.tripStart?.let { serviceDay + it + delay <= now / 1000 } ?: true
+                if (!started || !live.isLive(time, started = true)) return@map departure
+                // The city's timetable is to the second, so how late it is comes out right.
+                departure.copy(
+                    scheduled = (time.scheduled - departure.serviceDay).toInt(),
+                    expected = (time.expected - departure.serviceDay).toInt(),
+                    isRealtime = true,
+                )
+            }
+            .filter { it.time >= now - LIVE_GRACE_MS }
+            .sortedBy { it.time }
+        return stop.copy(departures = departures.take(max))
+    }
+
+    /** For [LATE]: from [LATE_S] ago until now. */
+    private fun lateVariables() =
+        JSONObject().put("start", System.currentTimeMillis() / 1000 - LATE_S).put("late", LATE_S)
 
     private fun departureOf(json: JSONObject): Departure {
         val trip = json.getJSONObject("trip")
@@ -287,6 +394,8 @@ class PeatusClient {
             scheduled = json.getInt("scheduledDeparture"),
             expected = json.getInt("realtimeDeparture"),
             isRealtime = json.optBoolean("realtime"),
+            tripStart = trip.optJSONObject("departureStoptime")?.takeIf { it.has("scheduledDeparture") }
+                ?.getInt("scheduledDeparture"),
         )
     }
 
@@ -393,6 +502,23 @@ class PeatusClient {
         /** At most \$n departures in the next \$range seconds; without a count, peatus.ee gives 5. */
         private const val WITHIN =
             "stoptimesWithoutPatterns(timeRange: \$range, numberOfDepartures: \$n, omitNonPickups: true) { $DEPARTURE }"
+
+        /** Departures that were due in the last \$late seconds, from \$start: see [withLive]. */
+        private const val LATE =
+            "late: stoptimesWithoutPatterns(startTime: \$start, timeRange: \$late, numberOfDepartures: 100," +
+                " omitNonPickups: true) { $DEPARTURE }"
+
+        /** How late a bus can be and still show; later than that is rare, and it may just not be coming. */
+        private const val LATE_S = 20 * 60
+
+        /**
+         * How far ahead of the timetable [live] asks about a trip's stops: the feed predicts up to about an hour
+         * ahead, so this covers whatever it can say, late vehicles included. Beyond, the delay carries on.
+         */
+        private const val TRIP_AHEAD_S = 90 * 60
+
+        /** One that left a few seconds ago is probably still at the stop. */
+        private const val LIVE_GRACE_MS = 30_000L
 
         /** For [stopWithin]: as many as there are. */
         const val ALL_DEPARTURES = 1000

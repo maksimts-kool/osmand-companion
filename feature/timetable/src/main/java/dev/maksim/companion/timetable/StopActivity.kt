@@ -32,8 +32,8 @@ import java.util.concurrent.Executors
 /**
  * A stop's timetable: one card per route, the route leaving soonest first. Folded, which is how they start, a
  * card is one line of the route's next departures, so all the routes fit on screen together; today those come
- * live where peatus.ee has them ([Next]), so there's no separate list of next departures. Unfolded, it's the
- * chosen day's times printed by hour like at the stop itself ([Fold]). Tapping a departure or a minute opens that
+ * live where there are live times ([Next], [PeatusClient.stopWithin]), so there's no separate list of next
+ * departures. Unfolded, it's the chosen day's times printed by hour like at the stop itself ([Fold]). Tapping a departure or a minute opens that
  * trip ([TripActivity]); tapping a route in the header jumps to it.
  *
  * OsmAnd opens this from the Next departure widget, so it's exported. Its stop menu's Show in Companion button
@@ -52,6 +52,17 @@ class StopActivity : AppCompatActivity() {
 
     /** Answers for a day that's no longer selected are dropped. */
     private var request = 0
+
+    /** What's on screen, so [refreshLive] only has to get the next departures again. */
+    private var shown: Triple<Stop, List<RouteDay>, List<Departure>?>? = null
+
+    /** Keeps today's live times fresh while the screen is open. */
+    private val refresh = object : Runnable {
+        override fun run() {
+            refreshLive()
+            binding.root.postDelayed(this, REFRESH_MS)
+        }
+    }
 
     /** How much of each route's day is open, by [RouteDay] key, kept across reloads of the same day. */
     private val folds = HashMap<String, Fold>()
@@ -113,7 +124,13 @@ class StopActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         load()
+        binding.root.postDelayed(refresh, REFRESH_MS)
         background.execute { OsmAndRoute.clearLeftover(this, companion.osmand) }
+    }
+
+    override fun onStop() {
+        binding.root.removeCallbacks(refresh)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -146,18 +163,31 @@ class StopActivity : AppCompatActivity() {
         }
     }
 
+    /** Today's next departures again, over the timetable already there; nothing changes if they don't come. */
+    private fun refreshLive() {
+        val (stop, routes) = shown ?: return
+        if (day != 0 || binding.progress.isVisible) return
+        val id = request
+        background.execute {
+            val next = runCatching { peatus.stopWithin(stopId, LIVE_WITHIN_S)?.departures }.getOrNull() ?: return@execute
+            runOnUiThread { if (id == request && !isDestroyed) show(Result.success(Triple(stop, routes, next))) }
+        }
+    }
+
     private fun accent() = MaterialColors.getColor(binding.content, androidx.appcompat.R.attr.colorPrimary)
 
     private fun show(result: Result<Triple<Stop, List<RouteDay>, List<Departure>?>>) {
         val content = binding.content
         binding.progress.isVisible = false
         val (stop, routes, next) = result.getOrElse {
+            shown = null
             States.error(content, getString(R.string.tt_load_failed, it.message)) {
                 States.loading(content, accent())
                 load()
             }
             return
         }
+        shown = Triple(stop, routes, next)
         // Coming from a loading or error state rather than a refresh: fade the timetable in.
         if (this.stop == null || content.getChildAt(0)?.id == R.id.state) {
             content.alpha = 0f
@@ -184,26 +214,30 @@ class StopActivity : AppCompatActivity() {
         }
         // Soonest first; the routes done for the day go last, in the usual order.
         val live = next.orEmpty().associateBy { it.serviceDay to it.tripId }
-        val upcoming = routes.associateWith { nextOf(it, live, now) }
-        val first = { route: RouteDay -> upcoming.getValue(route).firstOrNull() }
+        val days = routes.associateWith { dayOf(it, live) }
+        val first = { route: RouteDay -> days.getValue(route).firstOrNull { it.time >= now } }
         routes.sortedWith(
             compareBy<RouteDay>({ first(it) == null }, { first(it)?.time ?: 0L }).thenBy(RouteOrder) { it.route },
-        ).forEach { addRoute(it, upcoming.getValue(it), now) }
+        ).forEach { addRoute(it, days.getValue(it), now) }
     }
 
     /**
-     * [route]'s departures still to come, soonest first, each with its live time if it's among the stop's [live]
-     * next departures.
+     * [route]'s departures for the day in the order they leave, each at its live time if it's among the stop's
+     * [live] next departures.
      */
-    private fun nextOf(route: RouteDay, live: Map<Pair<Long, String>, Departure>, now: Long): List<Next> =
+    private fun dayOf(route: RouteDay, live: Map<Pair<Long, String>, Departure>): List<Next> =
         route.times.map { (seconds, tripId) ->
             val scheduled = TransitFormat.serviceTime(route.serviceDay, seconds)
             val departure = live[route.serviceDay to tripId]
             Next(tripId, scheduled, departure?.time ?: scheduled, departure?.isRealtime == true)
-        }.filter { it.time >= now }.sortedBy { it.time }
+        }.sortedBy { it.time }
 
-    /** [next]: the route's departures still to come, soonest first. */
-    private fun addRoute(route: RouteDay, next: List<Next>, now: Long) {
+    /**
+     * [day]: the route's departures, as [dayOf] has them. The hours show them at their live times, so a bus that's
+     * late is under the minute it leaves, in green.
+     */
+    private fun addRoute(route: RouteDay, day: List<Next>, now: Long) {
+        val next = day.filter { it.time >= now }
         val upcoming = next.firstOrNull()
         val item = TtItemRouteDayBinding.inflate(layoutInflater, binding.content, true)
         val color = ColorStateList.valueOf(Mode.of(route.mode).color)
@@ -213,33 +247,39 @@ class StopActivity : AppCompatActivity() {
         addNextTimes(item, route, next, color, now)
 
         // Service times can pass 24:00; the clock hour puts 25:10 under 01 at the end, as printed timetables do.
-        val hourOf = { seconds: Int -> Estonia.format("HH", TransitFormat.serviceTime(route.serviceDay, seconds)) }
-        val nextHour = upcoming?.let { Estonia.format("HH", it.scheduled) }
+        val hourOf = { time: Long -> Estonia.format("HH", time) }
+        val nextHour = upcoming?.let { hourOf(it.time) }
+        val liveColor = getColor(R.color.tt_live)
         // The hours before the next departure's, hidden until the whole day is asked for.
         val earlier = mutableListOf<View>()
-        for ((hour, times) in route.times.groupBy { hourOf(it.first) }) {
+        for ((hour, times) in day.groupBy { hourOf(it.time) }) {
             val line = TtItemHourBinding.inflate(layoutInflater, item.hours, true)
             if (nextHour != null && earlier.size == item.hours.childCount - 1 && hour != nextHour) earlier += line.root
             line.hour.text = hour
             if (hour == nextHour) {
                 line.hour.backgroundTintList = color
                 line.hour.setTextColor(Color.WHITE)
-            } else if (times.all { TransitFormat.serviceTime(route.serviceDay, it.first) < now }) {
+            } else if (times.all { it.time < now }) {
                 line.hour.alpha = PAST_ALPHA
             }
-            for ((seconds, tripId) in times) {
-                val time = TransitFormat.serviceTime(route.serviceDay, seconds)
+            for (departure in times) {
                 val minute = TtItemMinuteBinding.inflate(layoutInflater, line.minutes, true).root
-                minute.text = Estonia.format("mm", time)
-                minute.contentDescription = TransitFormat.clock(time)
-                minute.setOnClickListener { openTrip(tripId, route.serviceDay) }
-                if (tripId == upcoming?.tripId) {
+                minute.text = Estonia.format("mm", departure.time)
+                minute.contentDescription = listOfNotNull(
+                    TransitFormat.clock(departure.time), getString(R.string.tt_live).takeIf { departure.isRealtime },
+                ).joinToString(", ")
+                minute.setOnClickListener { openTrip(departure.tripId, route.serviceDay) }
+                if (departure.tripId == upcoming?.tripId) {
+                    // Like the first of the next departures above it.
                     minute.setBackgroundResource(R.drawable.tt_minute_bg)
-                    minute.backgroundTintList = color
-                    minute.setTextColor(Color.WHITE)
+                    minute.backgroundTintList =
+                        if (departure.isRealtime) ColorStateList.valueOf(liveColor).withAlpha(0x29) else color
+                    minute.setTextColor(if (departure.isRealtime) liveColor else Color.WHITE)
                     minute.setTypeface(minute.typeface, Typeface.BOLD)
-                } else if (time < now) {
+                } else if (departure.time < now) {
                     minute.alpha = PAST_ALPHA
+                } else if (departure.isRealtime) {
+                    minute.setTextColor(liveColor)
                 }
             }
         }
@@ -298,41 +338,44 @@ class StopActivity : AppCompatActivity() {
 
     /**
      * The line under a route's name: how soon the next one leaves, in the route's color, then the clock times of
-     * the ones after it, as many as fit ([TimesRow]); a dot marks the live ones. Or that it's done for the day.
+     * the ones after it, as many as fit ([TimesRow]); the live ones are green, with the live mark. Or that it's done
+     * for the day.
      */
     private fun addNextTimes(item: TtItemRouteDayBinding, route: RouteDay, next: List<Next>, color: ColorStateList, now: Long) {
         val muted = MaterialColors.getColor(item.times, com.google.android.material.R.attr.colorOnSurfaceVariant)
         if (next.isEmpty()) {
-            TtItemNextTimeBinding.inflate(layoutInflater, item.times, true).root.run {
-                setText(R.string.tt_done_today)
-                backgroundTintList = color.withAlpha(0x14)
-                setTextColor(muted)
-                foreground = null
+            with(TtItemNextTimeBinding.inflate(layoutInflater, item.times, true)) {
+                text.setText(R.string.tt_done_today)
+                text.setTextColor(muted)
+                root.backgroundTintList = color.withAlpha(0x14)
+                root.foreground = null
             }
             return
         }
+        val liveColor = getColor(R.color.tt_live)
         next.take(MAX_NEXT_TIMES).forEachIndexed { i, departure ->
-            TtItemNextTimeBinding.inflate(layoutInflater, item.times, true).root.run {
+            with(TtItemNextTimeBinding.inflate(layoutInflater, item.times, true)) {
                 val clock = TransitFormat.clock(departure.time)
                 val soon = if (i == 0) TransitFormat.relative(this@StopActivity, departure.time, now) else null
-                text = when (soon) {
+                text.text = when (soon) {
                     null -> clock
                     getString(R.string.tt_now) -> soon
                     else -> getString(R.string.tt_next_in, soon)
                 }
-                contentDescription = listOfNotNull(
-                    text, clock.takeIf { soon != null }, getString(R.string.tt_live).takeIf { departure.isRealtime },
+                root.contentDescription = listOfNotNull(
+                    text.text, clock.takeIf { soon != null }, getString(R.string.tt_live).takeIf { departure.isRealtime },
                 ).joinToString(", ")
+                // The first in the route's color; a live one in green instead, which the vehicle's time goes by.
                 if (i == 0) {
-                    backgroundTintList = color
-                    setTextColor(Color.WHITE)
-                    setTypeface(typeface, Typeface.BOLD)
+                    root.backgroundTintList =
+                        if (departure.isRealtime) ColorStateList.valueOf(liveColor).withAlpha(0x29) else color
+                    text.setTextColor(if (departure.isRealtime) liveColor else Color.WHITE)
+                    text.setTypeface(text.typeface, Typeface.BOLD)
+                } else if (departure.isRealtime) {
+                    text.setTextColor(liveColor)
                 }
-                if (departure.isRealtime) {
-                    setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.tt_ic_live, 0, 0, 0)
-                    compoundDrawableTintList = ColorStateList.valueOf(currentTextColor)
-                }
-                setOnClickListener { openTrip(departure.tripId, route.serviceDay) }
+                Rows.liveMark(live, departure.isRealtime, liveColor)
+                root.setOnClickListener { openTrip(departure.tripId, route.serviceDay) }
             }
         }
     }
@@ -375,6 +418,9 @@ class StopActivity : AppCompatActivity() {
         private const val DAYS = 7
         /** How far ahead the routes' departures get their live times: beyond, vehicles rarely report any. */
         private const val LIVE_WITHIN_S = 60 * 60
+
+        /** How often the live times are fetched again. */
+        private const val REFRESH_MS = 30_000L
         private const val SHOW_ZOOM = 17
 
         /** In a folded route's line; fewer show when they don't fit. */

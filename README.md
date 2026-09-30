@@ -24,7 +24,7 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | --- | --- |
 | **Map** | The stops around the map center, while it's in Estonia: colored dots from zoom 13, vehicle icons from 15. |
 | **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and when it was loaded (`Updated 20:08 · peatus.ee`). When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
-| **Stop menu → Next departures** | Opens the next departures like a departure board, up to 12 and none more than an hour away (big minutes to go, then route, destination, time, and live delay where available) in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap one for that trip. |
+| **Stop menu → Next departures** | Opens the next departures like a departure board, up to 12 and none more than an hour away (big minutes to go, then route, destination, time, and live delay where available: those minutes turn green, with a animated live mark) in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap one for that trip. |
 | **Stop menu → Full day** | Opens the rest of today by route, soonest first, as rows of times, in the same kind of sheet. Tap a time for that trip. |
 | **Stop menu → Show in Companion** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*) |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
@@ -38,10 +38,13 @@ notification to tap instead.
 In this app, a stop's header shows the routes serving it as big badges in their own colors (dimmed when they don't
 run that day); tap one to jump to its timetable. Below is a card per route for today or any of the next 6 days,
 the route leaving soonest first. A card starts folded to one line of its next departures, so all the routes fit on
-screen: how soon the next one leaves, then the times after it, live where available (marked with a dot). Tapping
+screen: how soon the next one leaves, then the times after it, live where available (in green, with an animated
+live mark; Tallinn's city buses, trolleybuses and trams). The hours below show live times too, so a late bus is
+under the minute it actually leaves, in green; today's live times refresh every 30 s. Tapping
 it unfolds the times from the next departure's hour on, laid out by hour like the timetables at Estonian stops,
 then the whole day, then folds it again. Routes done for today go last. Tap a departure or a minute to see
-that trip: every stop along the route with its time (the route's timetable). *Show in OsmAnd* moves OsmAnd's map
+that trip: every stop along the route with its time (the route's timetable), live in green where the vehicle
+gives its times, with the vehicle drawn where the live times put it. *Show in OsmAnd* moves OsmAnd's map
 to the stop.
 
 ### Route on OsmAnd's map
@@ -72,10 +75,23 @@ reached from the widget or the main menu. OsmAnd starts those itself; Android do
 ### How it works
 
 - **Data**: peatus.ee runs OpenTripPlanner on Estonia's national GTFS feed (all buses, trams, trains and ferries,
-  with live times where the operator sends them, e.g. Tallinn). `PeatusClient` uses its GraphQL endpoint
+  with live times where the operator sends them). `PeatusClient` uses its GraphQL endpoint
   (`api.peatus.ee/routing/v1/routers/estonia/index/graphql`): `stopsByRadius` with departures for the map,
   `stop` for Next departures, `stoptimesForServiceDate` for a day's timetable, `trip` for a route's stops, `stops`
   for the search. No API key and no download of the whole feed.
+- **Live times in Tallinn**: peatus.ee has none for Tallinn's city lines, so `TallinnLive` gets them from the
+  city's own feed, the one transport.tallinn.ee shows (`transport.tallinn.ee/siri-stop-departures.php?stopid=…`).
+  Its stop ids come from the city's stop list (`transport.tallinn.ee/data/stops.txt`, fetched once a day), by the
+  code on the stop sign: for older stops the id is peatus.ee's without `estonia:`, but not for newer ones
+  (Haabersti is `estonia:141510` on peatus.ee and 5877 in the feed). It's asked for a stop's next departures
+  (the stop screen and both sheets) when a Tallinn city bus, trolleybus or tram serves the stop. The feed is per
+  stop, so a trip's live times take one request per stop from 20 minutes behind its timetable to 90 minutes
+  ahead (the feed predicts about an hour ahead), 6 at a time, every 30 s while the trip is open; the stops after those get the last known delay, and those
+  before the first one the feed still lists the trip at are behind the vehicle. Its departures are matched to
+  peatus.ee's by route, timetabled time (the feed's is to the second, peatus.ee's rounded down to the minute) and
+  destination, as at the end of a line the vehicle arriving and the one leaving back can be due the same minute.
+  A bus running late has already dropped out of peatus.ee's next departures, so those of the last 20 minutes are
+  asked for too. If the feed doesn't answer, the timetable is shown as before.
 - **Following the map**: every 4 s `TimetableFeature` asks OsmAnd where its map is (`getAppInfo`). Only while the
   map is on screen and in Estonia, it loads the stops within 1.2 km. It loads again once the map moves 400 m,
   or after a minute for fresh departures. When OsmAnd is in the background, nothing is fetched.
@@ -156,7 +172,7 @@ app/                      shell: home screen with a tab per feature, OsmAnd stat
                           update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
 core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog,
                           OsmAndWatcher + FollowOsmAnd (start and stop with OsmAnd)
-feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient,
+feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient, TallinnLive,
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider,
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
                           States (Lottie loading/empty/error)
@@ -190,7 +206,7 @@ adb logcat | grep OsmandAidlService      # OsmAnd's side: shows "enabled: true/f
 
 AGP 9.4 (built-in Kotlin), Gradle 9.8, compileSdk/targetSdk 36, minSdk 24, WorkManager,
 `net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`), Lottie.
-Timetable data: peatus.ee (Transpordiamet). Route check: OpenStreetMap contributors, via the Overpass API.
+Timetable data: peatus.ee (Transpordiamet); live times in Tallinn: the City of Tallinn, via transport.tallinn.ee. Route check: OpenStreetMap contributors, via the Overpass API.
 
 ## Credits
 
@@ -200,5 +216,7 @@ recolored in the app to fit its theme (`feature/timetable/src/main/res/raw`):
 - Loading: [Bus Loader](https://lottiefiles.com/free-animation/bus-loader-LF8V0uZBm4) by Bijay Subba Limbu
 - Couldn't load: [No Internet Connection](https://lottiefiles.com/free-animation/no-internet-connection-jWCR3yXdDT)
 - Nothing leaves: [Clock Time](https://lottiefiles.com/free-animation/clock-time-YX86xw76OL)
+- Live times: [Go Live](https://lottiefiles.com/free-animation/go-live-FkhFJ5HQm5) by Games Hub, with its waves on
+  one side only and cropped to them
 
 The update popup's download animation (`app/src/main/res/raw/update_download.json`) is made for this app.

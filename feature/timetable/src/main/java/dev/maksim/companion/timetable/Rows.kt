@@ -1,11 +1,17 @@
 package dev.maksim.companion.timetable
 
 import android.content.res.ColorStateList
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.annotation.ColorInt
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import com.airbnb.lottie.LottieAnimationView
+import com.airbnb.lottie.LottieProperty
+import com.airbnb.lottie.model.KeyPath
 import com.google.android.material.color.MaterialColors
 import dev.maksim.companion.timetable.databinding.TtHeaderBinding
 import dev.maksim.companion.timetable.databinding.TtItemFactBinding
@@ -22,6 +28,21 @@ internal object Rows {
 
     fun row(parent: ViewGroup): TtItemRowBinding =
         TtItemRowBinding.inflate(LayoutInflater.from(parent.context), parent, true)
+
+    /**
+     * The mark before a departure time that's live, a dot sending out waves ([R.raw.tt_anim_live], from
+     * LottieFiles, recolored to [color]); hidden when it's from the timetable.
+     */
+    fun liveMark(view: LottieAnimationView, live: Boolean, @ColorInt color: Int) {
+        view.isVisible = live
+        if (!live) {
+            view.pauseAnimation()
+            return
+        }
+        val filter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
+        view.addValueCallback(KeyPath("**"), LottieProperty.COLOR_FILTER) { filter }
+        view.resumeAnimation()
+    }
 
     fun badge(view: TextView, route: String, mode: String?) {
         view.text = route
