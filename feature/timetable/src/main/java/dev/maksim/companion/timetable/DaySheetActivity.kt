@@ -22,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.timetable.databinding.TtActivityDaySheetBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetDepartureBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetRouteBinding
@@ -59,6 +60,9 @@ class DaySheetActivity : AppCompatActivity() {
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
 
+    /** From the button in OsmAnd until the first departures (or why not) are showing. */
+    private var screenLoad: Analytics.ScreenLoad? = null
+
     /** Turns the Refresh icon while loading. */
     private val spin by lazy {
         ObjectAnimator.ofFloat(binding.refresh, View.ROTATION, 0f, 360f).apply {
@@ -87,6 +91,8 @@ class DaySheetActivity : AppCompatActivity() {
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
         stopName = intent.getStringExtra(EXTRA_STOP_NAME)
         showsNext = intent.getBooleanExtra(EXTRA_NEXT, false)
+        val pressedAt = intent.getLongExtra(OpenedScreens.EXTRA_PRESSED_AT, -1).takeIf { it >= 0 && savedInstanceState == null }
+        screenLoad = Analytics.screenLoad(this, if (showsNext) "Next departures sheet" else "Full day sheet", pressedAt)
         header(stopName, Mode.of(intent.getStringExtra(EXTRA_MODE)))
         binding.subtitle.setText(if (showsNext) R.string.tt_next_departures else R.string.tt_rest_of_today)
 
@@ -128,7 +134,7 @@ class DaySheetActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this) { dismiss() }
         binding.refresh.setOnClickListener { load() }
         States.loading(binding.content, getColor(R.color.tt_osm_accent))
-        binding.fullTimetable.setOnClickListener { leaveFor(StopActivity.intent(this, stopId, stopName)) }
+        binding.fullTimetable.setOnClickListener { leaveFor(StopActivity.intent(this, stopId, stopName, OpenedScreens.now())) }
     }
 
     /** Keeps the times, live ones above all, fresh while the sheet is open. */
@@ -157,6 +163,7 @@ class DaySheetActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        screenLoad?.cancel()
         spin.cancel()
         background.shutdownNow()
         super.onDestroy()
@@ -201,6 +208,8 @@ class DaySheetActivity : AppCompatActivity() {
     }
 
     private fun show(result: Result<Loaded>, now: Long) {
+        screenLoad?.finish(result.isSuccess)
+        screenLoad = null
         binding.progress.isVisible = false
         // Finishes the turn it's on rather than stopping at an angle.
         spin.repeatCount = 0
@@ -349,15 +358,16 @@ class DaySheetActivity : AppCompatActivity() {
         /**
          * Opens the sheet for [stop], with its [next] departures or else the rest of today, in a fresh task of its
          * own, over whatever is in front (OsmAnd). [night] is whether OsmAnd looks dark right now; null follows the
-         * phone.
+         * phone. [pressedAt]: see [OpenedScreens.EXTRA_PRESSED_AT].
          */
-        fun intent(context: Context, stop: Stop, next: Boolean, night: Boolean?): Intent =
+        fun intent(context: Context, stop: Stop, next: Boolean, night: Boolean?, pressedAt: Long? = null): Intent =
             Intent().setClassName(context.packageName, DaySheetActivity::class.java.name)
                 .putExtra(EXTRA_STOP_ID, stop.id)
                 .putExtra(EXTRA_STOP_NAME, stop.name)
                 .putExtra(EXTRA_MODE, stop.mode)
                 .putExtra(EXTRA_NEXT, next)
                 .apply { if (night != null) putExtra(EXTRA_NIGHT, night) }
+                .apply { if (pressedAt != null) putExtra(OpenedScreens.EXTRA_PRESSED_AT, pressedAt) }
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
 }

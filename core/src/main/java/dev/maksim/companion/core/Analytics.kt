@@ -1,15 +1,22 @@
 package dev.maksim.companion.core
 
+import android.app.Activity
 import android.content.Context
+import android.os.SystemClock
 import androidx.core.content.edit
+import io.sentry.ITransaction
 import io.sentry.Sentry
+import io.sentry.SentryNanotimeDate
 import io.sentry.SpanStatus
+import io.sentry.TransactionContext
+import io.sentry.TransactionOptions
 import io.sentry.android.core.SentryAndroid
 import io.sentry.metrics.SentryMetricsParameters
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Crash reports, usage counts and traces (how long things take), all in Sentry, off until the user opts in: asked once on the home screen, then a
@@ -36,6 +43,9 @@ object Analytics {
     private var keys: Keys? = null
 
     private val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+    /** Screens timed by [screenLoad]; Sentry's own timing of them is dropped. */
+    private val selfTimedScreens: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** Whether this build has analytics at all; without, Settings hides the switch. */
     val isAvailable: Boolean get() = keys != null
@@ -107,6 +117,41 @@ object Analytics {
         }
     }
 
+    /**
+     * Times [activity] coming up, as the trace [name], from [pressedAt] ([SystemClock.elapsedRealtime] when the user
+     * asked for it, e.g. a button in OsmAnd; null: now) until [ScreenLoad.finish]. The requests in between ([timed])
+     * go inside it. Call from onCreate, after super.onCreate.
+     *
+     * For screens opened from outside this app: Sentry times a screen from when this app's last screen paused, which
+     * for those is whenever the user last left one of ours, so its timing of [activity] is dropped.
+     */
+    fun screenLoad(activity: Activity, name: String, pressedAt: Long?): ScreenLoad {
+        if (!Sentry.isEnabled()) return ScreenLoad(null)
+        selfTimedScreens += activity.javaClass.simpleName
+        val agoMs = pressedAt?.let { SystemClock.elapsedRealtime() - it }?.coerceAtLeast(0) ?: 0
+        val options = TransactionOptions().apply {
+            startTimestamp = SentryNanotimeDate(Date(System.currentTimeMillis() - agoMs), System.nanoTime() - agoMs * 1_000_000)
+            // So the requests made meanwhile ([timed]) are its children.
+            isBindToScope = true
+        }
+        return ScreenLoad(Sentry.startTransaction(TransactionContext(name, "ui.load"), options))
+    }
+
+    /** See [screenLoad]. */
+    class ScreenLoad internal constructor(private val transaction: ITransaction?) {
+        /** It's showing what it was opened for ([ok]), or why it couldn't. Only the first call counts. */
+        fun finish(ok: Boolean) = end(if (ok) SpanStatus.OK else SpanStatus.INTERNAL_ERROR)
+
+        /** Closed before it got that far. */
+        fun cancel() = end(SpanStatus.CANCELLED)
+
+        private fun end(status: SpanStatus) {
+            val transaction = transaction?.takeUnless { it.isFinished } ?: return
+            transaction.status = status
+            transaction.finish()
+        }
+    }
+
     /** What led up to a crash, attached to its report: the app's log lines ([AppLog]). */
     internal fun breadcrumb(message: String) {
         if (Sentry.isEnabled()) Sentry.addBreadcrumb(message)
@@ -127,6 +172,9 @@ object Analytics {
             // Traces: app start, screen loads with slow and frozen frames, and the requests timed by [timed]. A
             // sample in releases keeps within the free plan.
             options.tracesSampleRate = if (keys.debug) 1.0 else TRACES_SAMPLE_RATE
+            options.setBeforeSendTransaction { transaction, _ ->
+                transaction.takeUnless { it.contexts.trace?.operation == "ui.load" && it.transaction in selfTimedScreens }
+            }
         }
     }
 

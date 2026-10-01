@@ -20,6 +20,7 @@ import com.google.android.material.color.MaterialColors
 import dev.maksim.companion.core.companion
 import dev.maksim.companion.core.feature
 import dev.maksim.companion.core.padForSystemBars
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.timetable.databinding.TtActivityStopBinding
 import dev.maksim.companion.timetable.databinding.TtItemHourBinding
 import dev.maksim.companion.timetable.databinding.TtItemMinuteBinding
@@ -64,6 +65,12 @@ class StopActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * From the tap that opened it (in OsmAnd, or a screen here) until the timetable, or why not, is showing. It also
+     * opens from OsmAnd's widget, whose intent can't carry the tap: then it's timed from onCreate.
+     */
+    private var screenLoad: Analytics.ScreenLoad? = null
+
     /** How much of each route's day is open, by [RouteDay] key, kept across reloads of the same day. */
     private val folds = HashMap<String, Fold>()
 
@@ -88,6 +95,8 @@ class StopActivity : AppCompatActivity() {
         setContentView(binding.root)
         binding.root.padForSystemBars()
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
+        val pressedAt = intent.getLongExtra(OpenedScreens.EXTRA_PRESSED_AT, -1).takeIf { it >= 0 && savedInstanceState == null }
+        screenLoad = Analytics.screenLoad(this, "Stop timetable", pressedAt)
         day = savedInstanceState?.getInt(KEY_DAY) ?: 0
         headerLines = HeaderLines(binding.header, binding.top, binding.scroll, binding.content)
 
@@ -144,6 +153,7 @@ class StopActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        screenLoad?.cancel()
         background.shutdownNow()
         super.onDestroy()
     }
@@ -179,6 +189,8 @@ class StopActivity : AppCompatActivity() {
     private fun show(result: Result<Triple<Stop, List<RouteDay>, List<Departure>?>>) {
         val content = binding.content
         binding.progress.isVisible = false
+        screenLoad?.finish(result.isSuccess)
+        screenLoad = null
         val (stop, routes, next) = result.getOrElse {
             shown = null
             States.error(content, getString(R.string.tt_load_failed, it.message)) {
@@ -434,10 +446,12 @@ class StopActivity : AppCompatActivity() {
         private const val PULSE = 1.03f
         private const val PULSE_MS = 120L
 
-        fun intent(context: Context, stopId: String, stopName: String?): Intent =
+        /** [pressedAt]: [OpenedScreens.now] at the tap that opens it, so its load is timed from there. */
+        fun intent(context: Context, stopId: String, stopName: String?, pressedAt: Long? = null): Intent =
             Intent().setClassName(context.packageName, StopActivity::class.java.name)
                 .putExtra(EXTRA_STOP_ID, stopId)
                 .putExtra(EXTRA_STOP_NAME, stopName)
+                .apply { if (pressedAt != null) putExtra(OpenedScreens.EXTRA_PRESSED_AT, pressedAt) }
 
         fun dayLabel(context: Context, daysFromToday: Int): String = when (daysFromToday) {
             0 -> context.getString(R.string.tt_today)

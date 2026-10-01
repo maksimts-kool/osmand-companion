@@ -19,6 +19,12 @@ internal object OpenedScreens {
     /** The notification that opens a screen Android didn't let us open directly; one at a time. */
     const val NOTIFICATION_ID = 2
 
+    /**
+     * Intent extra: [now] at the tap that opens the screen (a button in OsmAnd, or a row here), so its load is timed
+     * from there (Analytics.screenLoad). Not on the notification's intent, which is tapped whenever.
+     */
+    const val EXTRA_PRESSED_AT = "pressed_at"
+
     private val resumedAt = ConcurrentHashMap<Pair<Screen, String>, Long>()
 
     /** What [NOTIFICATION_ID] is showing now, if anything. */

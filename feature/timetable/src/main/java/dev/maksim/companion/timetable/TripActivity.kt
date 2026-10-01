@@ -209,7 +209,7 @@ class TripActivity : AppCompatActivity() {
                 row.name.alpha = PAST_ALPHA
             }
             row.root.setOnClickListener {
-                startActivity(StopActivity.intent(this@TripActivity, tripStop.stop.id, tripStop.stop.name))
+                startActivity(StopActivity.intent(this@TripActivity, tripStop.stop.id, tripStop.stop.name, OpenedScreens.now()))
             }
         }
         // Start at the stop you came from, with a couple of stops before it in view.

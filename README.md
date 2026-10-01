@@ -153,7 +153,11 @@ All of it goes to [Sentry](https://sentry.io) (`sentry-android-core`, without ND
 - **Traces** (*Explore → Traces*): app start, screen loads with slow and frozen frames, and requests to
   peatus.ee (by query field, e.g. `POST api.peatus.ee stopsByRadius`), transport.tallinn.ee and Overpass, timed
   by `Analytics.timed(...)`. Inside the screen loading at the time, else on their own. All in debug builds, 20% in
-  releases.
+  releases. The screens OsmAnd opens are timed from the tap until they show what they're for, by
+  `Analytics.screenLoad(...)`: the Next departures and Full day sheets (`Next departures sheet`, `Full day sheet`)
+  and a stop's timetable (`Stop timetable`, from wherever it's opened; from OsmAnd's widget, from when it starts).
+  Sentry's own timing of them starts at whenever one of this app's screens last paused, which for a screen opened
+  from OsmAnd means nothing.
 
 All of it carries the release, Android version, phone model and Sentry's random id for the install (`user.id`, so a
 metric can count unique users). Opting out deletes that id and anything not yet sent.

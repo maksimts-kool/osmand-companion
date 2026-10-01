@@ -156,7 +156,7 @@ class TimetableFragment : Fragment() {
             }
             Rows.stop(results, stop, distance) {
                 Analytics.signal("Timetables.stopOpened", mapOf("from" to if (query.isEmpty()) "nearMap" else "search"))
-                startActivity(StopActivity.intent(requireContext(), stop.id, stop.name))
+                startActivity(StopActivity.intent(requireContext(), stop.id, stop.name, OpenedScreens.now()))
             }
         }
     }
