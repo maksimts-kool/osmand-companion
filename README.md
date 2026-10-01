@@ -139,6 +139,43 @@ Android installs an update only if it's signed with the same key as the installe
 2.0.0 was released on GitHub are signed with a local debug key, so uninstall that once and install the
 release APK. That clears the app's settings.
 
+## Crash reports and usage stats
+
+Off until the user opts in. The home screen asks once (*Share* / *No thanks*), and *Settings* → *Privacy* has
+the switch. A build without Sentry's DSN (below) has none of it, and never asks.
+
+Both go to [Sentry](https://sentry.io) (`sentry-android-core`, without NDK or session replay):
+
+- **Crashes**: crashes, freezes (ANRs) and crash-free sessions per release, with the app's log lines as
+  breadcrumbs. No IP address, user or device name.
+- **Usage counts**: Sentry metrics (*Explore → Metrics*), counted by `Analytics.signal(name, params)`, which can
+  be grouped by their parameters. No location, stops or searches.
+
+Both carry the release, Android version, phone model and Sentry's random id for the install (`user.id`, so a
+metric can count unique users). Opting out deletes that id and anything not yet sent.
+
+| Metric | When | Parameters |
+| --- | --- | --- |
+| `App.opened` | Home screen opens (3 s later) | `osmand` (missing / disconnected / noAccess / ready), `osmandApp`, `timetables`, `displayOverApps`, `startWithOsmAnd` |
+| `Timetables.turnedOn` / `turnedOff` | The *Show timetables in OsmAnd* switch | |
+| `Timetables.activeOnMap` | Stops loaded onto OsmAnd's map, once a day | |
+| `Timetables.button` | A stop menu button in OsmAnd | `button` (nextDepartures / fullDay / showInApp) |
+| `Timetables.openBlocked` | Android didn't let a screen open over OsmAnd | `screen`, `notified` |
+| `Timetables.stopOpened` | A stop tapped in this app's list | `from` (nearMap / search) |
+| `Peatus.failed` | Loading stops failed (once per streak of failures) | `error` |
+
+Add more with `Analytics.signal(name, params)`, or `Analytics.daily(name)` for at most once a day per device.
+Never put anything in them that could identify someone.
+
+The DSN goes in `local.properties` (gitignored); CI reads the secret `SENTRY_DSN`:
+
+```properties
+sentryDsn=https://…@o….ingest.de.sentry.io/…
+```
+
+Debug builds report to Sentry's `debug` environment, so filter by `release` for real users. In the Sentry
+project, turn on *Settings → Security & Privacy → Prevent Storing of IP Addresses*.
+
 ## Releases
 
 Bump `appVersion` in `gradle.properties` if you like, then tag and push:
@@ -163,7 +200,8 @@ Releases are signed with a key kept out of git. On the maintainer's machine:
   are signed with the same key too, so `adb install -r` and GitHub updates replace each other.
 
 CI gets the same key from the repository secrets `SIGNING_KEYSTORE_BASE64` (the .jks, base64),
-`SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`.
+`SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`, and Sentry's DSN from
+`SENTRY_DSN` (optional: without it the release has no crash reports or usage stats).
 
 ## Code map
 
@@ -171,7 +209,8 @@ CI gets the same key from the repository secrets `SIGNING_KEYSTORE_BASE64` (the 
 app/                      shell: home screen with a tab per feature, OsmAnd status, log;
                           update/: Updater, GitHubReleases, UpdateWorker, InstallResultReceiver
 core/                     OsmAndConnection, CompanionService (keeps the process alive), BootReceiver, AppLog,
-                          OsmAndWatcher + FollowOsmAnd (start and stop with OsmAnd)
+                          OsmAndWatcher + FollowOsmAnd (start and stop with OsmAnd),
+                          Analytics (opt-in crash reports and usage stats, in Sentry)
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient, TallinnLive,
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider,
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
@@ -205,7 +244,8 @@ adb logcat | grep OsmandAidlService      # OsmAnd's side: shows "enabled: true/f
 ## Stack
 
 AGP 9.4 (built-in Kotlin), Gradle 9.8, compileSdk/targetSdk 36, minSdk 24, WorkManager,
-`net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`), Lottie.
+`net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`), Lottie,
+Sentry (opt-in).
 Timetable data: peatus.ee (Transpordiamet); live times in Tallinn: the City of Tallinn, via transport.tallinn.ee. Route check: OpenStreetMap contributors, via the Overpass API.
 
 ## Credits

@@ -22,4 +22,7 @@ dependencies {
 
     api("androidx.appcompat:appcompat:1.7.1")
     api("com.google.android.material:material:1.14.0")
+
+    // Crash reports and usage counts, once the user opts in (Analytics). Only the core: no NDK crashes or session replay.
+    implementation("io.sentry:sentry-android-core:8.59.0")
 }

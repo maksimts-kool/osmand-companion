@@ -19,11 +19,15 @@ import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.CompanionService
+import dev.maksim.companion.core.FollowOsmAnd
 import dev.maksim.companion.core.OsmAndConnection
+import dev.maksim.companion.core.feature
 import dev.maksim.companion.databinding.ActivityMainBinding
 import dev.maksim.companion.databinding.DialogUpdateProgressBinding
 import dev.maksim.companion.timetable.OsmAndStopUi
+import dev.maksim.companion.timetable.TimetableFeature
 import dev.maksim.companion.timetable.TimetableFragment
 import dev.maksim.companion.update.Release
 import dev.maksim.companion.update.UpdateWorker
@@ -36,6 +40,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     private val app get() = application as CompanionApp
 
     private var updateDialog: AlertDialog? = null
+    private var analyticsDialog: AlertDialog? = null
 
     /** Follows a running update; see [showProgress]. */
     private var progressDialog: AlertDialog? = null
@@ -83,6 +88,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             showTab(R.id.tab_timetables)
             updateRequested = isUpdateLink(intent)
             Updater.checkIfStale()
+            if (Analytics.shouldAsk()) askAnalytics()
+            binding.root.postDelayed(::reportOpened, OPENED_REPORT_DELAY_MS)
         } else {
             // The tab bar doesn't keep its selection when recreated (e.g. night mode); the shown fragment does.
             supportFragmentManager.fragments.firstOrNull { !it.isHidden }?.tag?.toIntOrNull()?.let { selectTab(it) }
@@ -119,6 +126,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
 
     override fun onDestroy() {
         updateDialog?.dismiss()
+        analyticsDialog?.dismiss()
         progressDialog?.dismiss()
         super.onDestroy()
     }
@@ -211,6 +219,42 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             .show()
     }
 
+    /** Asked once; both answers are as easy. Settings has the switch to change it later. */
+    private fun askAnalytics() {
+        analyticsDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.analytics_dialog_title)
+            .setMessage(R.string.analytics_dialog_message)
+            .setCancelable(false)
+            .setPositiveButton(R.string.analytics_dialog_yes) { _, _ -> Analytics.setEnabled(true) }
+            .setNegativeButton(R.string.analytics_dialog_no) { _, _ -> Analytics.setEnabled(false) }
+            .show()
+    }
+
+    /**
+     * How far setup got, once per launch (if the user opted in): where people get stuck. After a moment, so the
+     * connection to OsmAnd is up by then.
+     */
+    private fun reportOpened() {
+        if (isDestroyed) return
+        val osmand = app.osmand
+        val state = when {
+            osmand.osmandPackage == null && osmand.findInstalledOsmand() == null -> "missing"
+            !osmand.isConnected -> "disconnected"
+            !osmand.hasAccess -> "noAccess"
+            else -> "ready"
+        }
+        Analytics.signal(
+            "App.opened",
+            mapOf(
+                "osmand" to state,
+                "osmandApp" to (osmand.osmandPackage ?: "none"),
+                "timetables" to feature<TimetableFeature>().isEnabled.toString(),
+                "displayOverApps" to Settings.canDrawOverlays(this).toString(),
+                "startWithOsmAnd" to FollowOsmAnd.isWatcherOn(this).toString(),
+            ),
+        )
+    }
+
     private fun startUpdate(release: Release) {
         if (canInstallUpdates()) return Updater.install(release)
         toast(R.string.update_allow_install)
@@ -286,5 +330,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
     private companion object {
         /** The tabs in activity_main's tab bar, in order. */
         val TAB_IDS = listOf(R.id.tab_timetables, R.id.tab_log)
+
+        const val OPENED_REPORT_DELAY_MS = 3000L
     }
 }

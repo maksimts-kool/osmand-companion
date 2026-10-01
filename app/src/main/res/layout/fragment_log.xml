@@ -53,6 +53,40 @@
             android:layout_height="wrap_content"
             android:layout_marginVertical="12dp" />
 
+        <!-- Crash reports and usage stats, off until the user opts in: see Analytics. Gone in builds without them. -->
+        <LinearLayout
+            android:id="@+id/analyticsSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/analytics_title"
+                android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/analyticsSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/analytics_switch"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/analytics_hint"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="12dp" />
+        </LinearLayout>
+
         <!-- This version and the update check: see Updater. -->
         <LinearLayout
             android:layout_width="match_parent"

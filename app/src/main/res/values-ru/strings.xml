@@ -26,6 +26,14 @@
     <string name="follow_dialog_off">Чтобы не запускаться вместе с OsmAnd, выключите «OsmAnd Companion: запуск вместе с OsmAnd» на следующем экране.</string>
     <string name="follow_open_settings">Открыть настройки</string>
 
+    <string name="analytics_title">Конфиденциальность</string>
+    <string name="analytics_switch">Отправлять отчёты о сбоях и статистику</string>
+    <string name="analytics_hint">Отчёты о сбоях и статистика того, какими функциями пользуются, уходят в Sentry. Никогда — ваше местоположение, остановки, поиски или что-либо ещё о вас.</string>
+    <string name="analytics_dialog_title">Помочь улучшить Companion?</string>
+    <string name="analytics_dialog_message">Companion может отправлять в Sentry отчёты о сбоях и анонимную статистику того, какими функциями пользуются, чтобы я мог исправлять ошибки и знать, над чем стоит работать.\n\nНикогда — ваше местоположение, остановки, которые вы смотрите, поиски или что-либо ещё о вас. Это можно выключить в любой момент в настройках.</string>
+    <string name="analytics_dialog_yes">Отправлять</string>
+    <string name="analytics_dialog_no">Нет, спасибо</string>
+
     <string name="version">Версия %1$s</string>
     <string name="update_check">Проверить обновления</string>
     <string name="update_checking">Проверка обновлений…</string>

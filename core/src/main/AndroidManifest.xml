@@ -15,6 +15,11 @@
     </queries>
 
     <application>
+        <!-- Sentry starts only once the user opts in: see Analytics. -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
         <service
             android:name=".CompanionService"
             android:exported="false"

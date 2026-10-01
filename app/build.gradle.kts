@@ -22,6 +22,13 @@ val keystoreProperties = Properties().apply {
 fun signingValue(key: String, env: String): String? = keystoreProperties.getProperty(key) ?: System.getenv(env)
 val releaseStoreFile = signingValue("storeFile", "SIGNING_STORE_FILE")
 
+// Sentry's DSN, for crash reports and usage stats (README): local.properties locally, an environment variable on CI.
+// A build without it has no analytics, and doesn't ask the user about it.
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+fun analyticsKey(key: String, env: String): String = localProperties.getProperty(key) ?: System.getenv(env).orEmpty()
+
 android {
     namespace = "dev.maksim.companion"
     compileSdk = 36
@@ -34,6 +41,7 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersion
+        buildConfigField("String", "SENTRY_DSN", "\"${analyticsKey("sentryDsn", "SENTRY_DSN")}\"")
     }
 
     signingConfigs {

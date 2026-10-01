@@ -8,7 +8,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Process-wide log: logcat plus the last [MAX_LINES] lines for the log screen.
+ * Process-wide log: logcat plus the last [MAX_LINES] lines for the log screen, and breadcrumbs for crash reports
+ * ([Analytics]).
  * Background features run without any activity, so the history lives here.
  */
 object AppLog {
@@ -27,6 +28,7 @@ object AppLog {
 
     fun log(message: String) {
         Log.i(TAG, message)
+        Analytics.breadcrumb(message)
         val line = synchronized(this) {
             "${timeFormat.format(Date())}  $message".also {
                 lines.addLast(it)

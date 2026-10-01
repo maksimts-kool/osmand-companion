@@ -11,6 +11,7 @@ import android.os.HandlerThread
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.edit
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.AppLog
 import dev.maksim.companion.core.BackgroundFeature
 import dev.maksim.companion.core.OsmAndConnection
@@ -143,10 +144,14 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 fetchedLon = center.longitude
                 failures = 0
                 ui.showStops(nearbyStops, now)
+                Analytics.daily("Timetables.activeOnMap")
             } catch (e: IOException) {
                 failures++
                 retryAt = now + minOf(REFRESH_MS, TICK_MS shl minOf(failures, 5))
-                if (failures == 1) AppLog.log("Timetables: couldn't load stops: ${e.message}")
+                if (failures == 1) {
+                    AppLog.log("Timetables: couldn't load stops: ${e.message}")
+                    Analytics.signal("Peatus.failed", mapOf("error" to e.message.orEmpty().take(ERROR_MAX_CHARS)))
+                }
             }
         }
         ui.updateWidget(widgetStop(center.latitude, center.longitude), now)
@@ -185,6 +190,12 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         handler?.post {
             pinnedStopId = stopId
             val now = System.currentTimeMillis()
+            val name = when (button) {
+                OsmAndStopUi.BUTTON_SHOW_IN_APP -> "showInApp"
+                OsmAndStopUi.BUTTON_FULL_DAY -> "fullDay"
+                else -> "nextDepartures"
+            }
+            Analytics.signal("Timetables.button", mapOf("button" to name))
             try {
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId)
@@ -226,7 +237,10 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         context.startActivity(intent)
         handler?.postDelayed({
             if (OpenedScreens.resumedSince(screen, stopId, asked)) return@postDelayed
-            if (!notifyOpen(intent, name)) return@postDelayed
+            val notified = notifyOpen(intent, name)
+            // How often "display over other apps" is missing where it matters.
+            Analytics.signal("Timetables.openBlocked", mapOf("screen" to screen.name, "notified" to notified.toString()))
+            if (!notified) return@postDelayed
             OpenedScreens.notified(screen, stopId)
             // It may have come up between the check and now, before it could know to take this back.
             if (OpenedScreens.resumedSince(screen, stopId, asked)) {
@@ -286,5 +300,8 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
 
         /** Departures per stop, for the widget and to tell which way a stop goes. */
         const val DEPARTURES = 5
+
+        /** Enough of an error message to tell failures apart in the usage stats. */
+        const val ERROR_MAX_CHARS = 100
     }
 }

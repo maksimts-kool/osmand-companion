@@ -9,16 +9,18 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.AppLog
 import dev.maksim.companion.core.FollowOsmAnd
 import dev.maksim.companion.databinding.FragmentLogBinding
 import dev.maksim.companion.update.Updater
 
 /**
- * Settings: starting and stopping with OsmAnd ([FollowOsmAnd]), this version with its update check, then what every
- * feature logged, newest on top.
+ * Settings: starting and stopping with OsmAnd ([FollowOsmAnd]), crash reports and usage stats ([Analytics]), this
+ * version with its update check, then what every feature logged, newest on top.
  */
 class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
 
@@ -40,6 +42,10 @@ class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
         }
         binding.stopSwitch.setOnCheckedChangeListener { button, checked ->
             if (button.isPressed) FollowOsmAnd.setStopWithOsmAnd(requireContext(), checked)
+        }
+        binding.analyticsSection.isVisible = Analytics.isAvailable
+        binding.analyticsSwitch.setOnCheckedChangeListener { button, checked ->
+            if (button.isPressed) Analytics.setEnabled(checked)
         }
         return binding.root
     }
@@ -80,6 +86,8 @@ class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
     override fun onStart() {
         super.onStart()
         showFollowSettings()
+        // Also answered in the home screen's dialog.
+        binding.analyticsSwitch.isChecked = Analytics.isEnabled()
         AppLog.addListener(this)
         binding.logText.text = AppLog.history().asReversed().joinToString("\n")
         Updater.addListener(this)

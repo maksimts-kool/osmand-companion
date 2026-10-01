@@ -1,6 +1,7 @@
 package dev.maksim.companion
 
 import android.app.Application
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.BackgroundFeature
 import dev.maksim.companion.core.CompanionHost
 import dev.maksim.companion.core.OsmAndConnection
@@ -17,6 +18,7 @@ class CompanionApp : Application(), CompanionHost {
 
     override fun onCreate() {
         super.onCreate()
+        Analytics.init(this, Analytics.Keys(BuildConfig.SENTRY_DSN, BuildConfig.VERSION_NAME, BuildConfig.DEBUG))
         osmand = OsmAndConnection(this)
         features = listOf(
             TimetableFeature(this, osmand),

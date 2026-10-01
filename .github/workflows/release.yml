@@ -29,6 +29,8 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Optional: without it the release has no crash reports or usage stats (README).
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
             echo "::error::The SIGNING_* secrets are missing (README → Releases)"

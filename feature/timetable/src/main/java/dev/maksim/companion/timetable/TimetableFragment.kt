@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
+import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.CompanionService
 import dev.maksim.companion.core.canPostNotifications
 import dev.maksim.companion.core.companion
@@ -94,6 +95,7 @@ class TimetableFragment : Fragment() {
 
     private fun setEnabled(enabled: Boolean) {
         feature.isEnabled = enabled
+        Analytics.signal(if (enabled) "Timetables.turnedOn" else "Timetables.turnedOff")
         CompanionService.update(requireContext())
         updateOverlayCard()
     }
@@ -153,6 +155,7 @@ class TimetableFragment : Fragment() {
                 getString(R.string.tt_distance_m, distanceMeters(lat, lon, stop.lat, stop.lon).roundToInt())
             }
             Rows.stop(results, stop, distance) {
+                Analytics.signal("Timetables.stopOpened", mapOf("from" to if (query.isEmpty()) "nearMap" else "search"))
                 startActivity(StopActivity.intent(requireContext(), stop.id, stop.name))
             }
         }
