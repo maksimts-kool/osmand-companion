@@ -256,35 +256,50 @@ class PeatusClient {
 
     /**
      * [trip] at the times its vehicle gives, for a Tallinn city line ([TallinnLive]); as it is for any other, or
-     * when the city's feed doesn't answer. The feed is per stop, so it's asked about each stop the vehicle may be
-     * at or near: from [LATE_S] behind the timetable to [TRIP_AHEAD_S] ahead of it. The feed forgets a stop once
-     * the vehicle has left it, so the stops before the first one it still lists the trip at are behind the vehicle
-     * ([Trip.liveFrom]). Until it has left the first, the trip isn't on its way, and whatever the feed says of it
-     * is its vehicle's guess from the trip before: it's the timetable until then. The vehicle's delay is the same
-     * at all the stops ahead of it, so if one stop says the trip has a vehicle ([TallinnLive.Times.isLive]), every
-     * stop that lists it has its live time, on time too. Those after, that the feed says nothing about, get the
-     * delay of the one before.
+     * when the city's feed doesn't answer. The feed is per stop, and forgets a stop once the vehicle has left it, so
+     * the first stop it still lists the trip at is where the vehicle is headed ([Trip.liveFrom]): the stops before
+     * are behind it. Until it has left the first, the trip isn't on its way, and whatever the feed says of it is
+     * its vehicle's guess from the trip before: it's the timetable until then. The vehicle's delay is the same at
+     * all the stops ahead of it, so if one stop says the trip has a vehicle ([TallinnLive.Times.isLive]), every
+     * stop it lists the trip at has its live time, on time too.
+     *
+     * So it only asks about enough stops to find that first one ([findVehicle]), among those the vehicle may be at
+     * or near: from [LATE_S] behind the timetable to [TRIP_AHEAD_S] ahead of it. The stops ahead it didn't ask
+     * about, in that window, are live with the delay of the one before, as the feed would have them; those it says
+     * nothing about, or further ahead, get that delay on their timetable.
      */
     fun live(trip: Trip): Trip {
         if (!TallinnLive.covers(trip.routeId)) return trip
         val now = System.currentTimeMillis() / 1000
-        val near = trip.stops.filter { trip.serviceDay + it.scheduled in now - LATE_S..now + TRIP_AHEAD_S }
+        val near = trip.stops.indices.filter { trip.serviceDay + trip.stops[it].scheduled in now - LATE_S..now + TRIP_AHEAD_S }
         if (near.isEmpty()) return trip
-        val feed = tallinn.departures(near.map { it.stop }.distinctBy { it.id })
-        val listed = trip.stops.map {
-            feed[it.stop.id]?.find(trip.route, trip.mode, trip.headsign, trip.serviceDay + it.scheduled)
+        val feed = HashMap<String, TallinnLive.Times>()
+        val asked = HashSet<Int>()
+        fun ask(stops: IntRange) {
+            asked += stops
+            feed += tallinn.departures(stops.map { trip.stops[it].stop }.filter { it.id !in feed }.distinctBy { it.id })
         }
-        val first = listed.indexOfFirst { it != null }
+        fun listed(i: Int) = feed[trip.stops[i].stop.id]
+            ?.find(trip.route, trip.mode, trip.headsign, trip.serviceDay + trip.stops[i].scheduled)
+        fun hasVehicle() = asked.any { i ->
+            listed(i)?.let { feed.getValue(trip.stops[i].stop.id).isLive(it, started = true) } == true
+        }
+
+        val first = findVehicle(near.first()..near.last(), trip.stops.indexOfFirst { trip.serviceDay + it.scheduled >= now }, ::ask) {
+            listed(it) != null
+        }
         // Still at its first stop, or not due to leave it yet.
-        if (first <= 0 || trip.serviceDay + trip.stops.first().scheduled > now) return trip
-        val hasVehicle = trip.stops.indices.any { i ->
-            listed[i]?.let { feed.getValue(trip.stops[i].stop.id).isLive(it, started = true) } == true
+        if (first == null || first <= 0 || trip.serviceDay + trip.stops.first().scheduled > now) return trip
+        // A vehicle exactly on time only shows in the stops' lists as a whole: ask further ahead until one does.
+        while (!hasVehicle()) {
+            val next = (asked.max() + 1).takeIf { it <= near.last() } ?: return trip
+            ask(next..minOf(next + TRIP_BATCH - 1, near.last()))
         }
-        if (!hasVehicle) return trip
         var delay = 0
         val stops = trip.stops.mapIndexed { i, stop ->
-            val time = listed[i]
+            val time = listed(i)
             when {
+                i < first -> stop
                 time != null -> {
                     val scheduled = (time.scheduled - trip.serviceDay).toInt()
                     val expected = (time.expected - trip.serviceDay).toInt()
@@ -292,11 +307,39 @@ class PeatusClient {
                     // The city's timetable is to the second, so how late it is comes out right.
                     stop.copy(scheduled = scheduled, expected = expected, isRealtime = true)
                 }
-                i < first -> stop
+                i !in asked && i in near.first()..near.last() -> stop.copy(expected = stop.scheduled + delay, isRealtime = true)
                 else -> stop.copy(expected = stop.scheduled + delay)
             }
         }
         return trip.copy(stops = stops, liveFrom = first)
+    }
+
+    /**
+     * The first stop in [range] that [listed] says the feed lists, where the stops before it aren't: the vehicle's
+     * next stop. Has [fetch] ask about [TRIP_BATCH] stops at a time (the feed answers those at once), starting just before
+     * [due], the stop it's due at by the timetable, and going back while the first it lists has one before it that
+     * wasn't asked about, or on while it lists none. Null if it lists none from there on.
+     */
+    private fun findVehicle(range: IntRange, due: Int, fetch: (IntRange) -> Unit, listed: (Int) -> Boolean): Int? {
+        val asked = sortedSetOf<Int>()
+        fun ask(stops: IntRange) {
+            fetch(stops)
+            asked += stops
+        }
+        val start = (if (due < 0) range.last else due - 1).coerceIn(range)
+        ask(start..minOf(start + TRIP_BATCH - 1, range.last))
+        while (true) {
+            val first = asked.firstOrNull(listed)
+            when {
+                first == null -> {
+                    val next = asked.last() + 1
+                    if (next > range.last) return null
+                    ask(next..minOf(next + TRIP_BATCH - 1, range.last))
+                }
+                first == range.first || first - 1 in asked -> return first
+                else -> ask(maxOf(range.first, first - TRIP_BATCH)..first - 1)
+            }
+        }
     }
 
     /**
@@ -526,6 +569,9 @@ class PeatusClient {
          * ahead, so this covers whatever it can say, late vehicles included. Beyond, the delay carries on.
          */
         private const val TRIP_AHEAD_S = 90 * 60
+
+        /** Stops [live] asks the feed about at a time, while it looks for the vehicle. */
+        private const val TRIP_BATCH = 6
 
         /** One that left a few seconds ago is probably still at the stop. */
         private const val LIVE_GRACE_MS = 30_000L
