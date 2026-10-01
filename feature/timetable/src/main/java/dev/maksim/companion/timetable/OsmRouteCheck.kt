@@ -1,5 +1,6 @@
 package dev.maksim.companion.timetable
 
+import dev.maksim.companion.core.Analytics
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -120,7 +121,10 @@ class OsmRouteCheck {
         }
     }
 
-    private fun post(server: String, query: String): JSONObject {
+    private fun post(server: String, query: String): JSONObject =
+        Analytics.timed("http.client", "POST ${URL(server).host}") { send(server, query) }
+
+    private fun send(server: String, query: String): JSONObject {
         val connection = URL(server).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"

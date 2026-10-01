@@ -1,5 +1,6 @@
 package dev.maksim.companion.timetable
 
+import dev.maksim.companion.core.Analytics
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -118,7 +119,9 @@ class TallinnLive {
         }
     }
 
-    private fun get(url: String): String {
+    private fun get(url: String): String = Analytics.timed("http.client", "GET transport.tallinn.ee") { download(url) }
+
+    private fun download(url: String): String {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = 10_000

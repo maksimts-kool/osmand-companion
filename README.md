@@ -144,14 +144,18 @@ release APK. That clears the app's settings.
 Off until the user opts in. The home screen asks once (*Share* / *No thanks*), and *Settings* → *Privacy* has
 the switch. A build without Sentry's DSN (below) has none of it, and never asks.
 
-Both go to [Sentry](https://sentry.io) (`sentry-android-core`, without NDK or session replay):
+All of it goes to [Sentry](https://sentry.io) (`sentry-android-core`, without NDK or session replay):
 
 - **Crashes**: crashes, freezes (ANRs) and crash-free sessions per release, with the app's log lines as
   breadcrumbs. No IP address, user or device name.
 - **Usage counts**: Sentry metrics (*Explore → Metrics*), counted by `Analytics.signal(name, params)`, which can
   be grouped by their parameters. No location, stops or searches.
+- **Traces** (*Explore → Traces*): app start, screen loads with slow and frozen frames, and requests to
+  peatus.ee (by query field, e.g. `POST api.peatus.ee stopsByRadius`), transport.tallinn.ee and Overpass, timed
+  by `Analytics.timed(...)`. Inside the screen loading at the time, else on their own. All in debug builds, 20% in
+  releases.
 
-Both carry the release, Android version, phone model and Sentry's random id for the install (`user.id`, so a
+All of it carries the release, Android version, phone model and Sentry's random id for the install (`user.id`, so a
 metric can count unique users). Opting out deletes that id and anything not yet sent.
 
 | Metric | When | Parameters |

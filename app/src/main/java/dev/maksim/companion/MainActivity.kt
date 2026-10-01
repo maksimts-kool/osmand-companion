@@ -126,6 +126,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
 
     override fun onDestroy() {
         updateDialog?.dismiss()
+        // Going away, not answered: nothing to show next.
+        analyticsDialog?.setOnDismissListener(null)
         analyticsDialog?.dismiss()
         progressDialog?.dismiss()
         super.onDestroy()
@@ -167,6 +169,8 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
                 else -> getString(R.string.update_downloading, progress)
             }
         }
+        // Not over the analytics question; it comes once that's answered.
+        if (analyticsDialog?.isShowing == true) return
         if (release != null && progress == null && (updateRequested || Updater.shouldPrompt(release))) {
             updateRequested = false
             showUpdateDialog(release)
@@ -227,6 +231,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             .setCancelable(false)
             .setPositiveButton(R.string.analytics_dialog_yes) { _, _ -> Analytics.setEnabled(true) }
             .setNegativeButton(R.string.analytics_dialog_no) { _, _ -> Analytics.setEnabled(false) }
+            .setOnDismissListener { onUpdateChanged() }
             .show()
     }
 

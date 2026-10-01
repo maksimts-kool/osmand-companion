@@ -1,5 +1,6 @@
 package dev.maksim.companion.timetable
 
+import dev.maksim.companion.core.Analytics
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -449,7 +450,13 @@ class PeatusClient {
 
     private fun baseName(name: String) = name.substringBefore(" (").trim().lowercase(Locale.ROOT)
 
+    /** Timed in Sentry's traces by the query's field (stop, stopsByRadius, …), never its variables. */
     private fun request(query: String, variables: JSONObject): JSONObject {
+        val field = FIELD.find(query)?.groupValues?.get(1) ?: "query"
+        return Analytics.timed("http.client", "POST api.peatus.ee $field") { post(query, variables) }
+    }
+
+    private fun post(query: String, variables: JSONObject): JSONObject {
         val body = JSONObject().put("query", query.trimIndent()).put("variables", variables).toString()
         val connection = URL(ENDPOINT).openConnection() as HttpURLConnection
         try {
@@ -484,6 +491,9 @@ class PeatusClient {
         const val REGIONAL = "REGIONAL"
 
         private const val ENDPOINT = "https://api.peatus.ee/routing/v1/routers/estonia/index/graphql"
+
+        /** A query's top field: the first name after its opening brace. */
+        private val FIELD = Regex("""\{\s*(\w+)""")
 
         /** Arrivals at the end of a line are dropped after the fact, so ask for a few more. */
         private const val EXTRA_FOR_ARRIVALS = 4

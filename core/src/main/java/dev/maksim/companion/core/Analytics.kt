@@ -3,6 +3,7 @@ package dev.maksim.companion.core
 import android.content.Context
 import androidx.core.content.edit
 import io.sentry.Sentry
+import io.sentry.SpanStatus
 import io.sentry.android.core.SentryAndroid
 import io.sentry.metrics.SentryMetricsParameters
 import java.io.File
@@ -11,7 +12,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Crash reports and usage counts, both in Sentry, off until the user opts in: asked once on the home screen, then a
+ * Crash reports, usage counts and traces (how long things take), all in Sentry, off until the user opts in: asked once on the home screen, then a
  * switch in Settings. A build without the DSN (README → Crash reports and usage stats) has neither and never asks.
  *
  * Nothing personal goes out: no location, no stops or searches, no account, no IP address. Reports and counts carry
@@ -29,6 +30,7 @@ object Analytics {
     private const val KEY_DAILY_PREFIX = "daily_"
     private const val SENTRY_INSTALLATION_FILE = "INSTALLATION"
     private const val SENTRY_CACHE_DIR = "sentry"
+    private const val TRACES_SAMPLE_RATE = 0.2
 
     private lateinit var context: Context
     private var keys: Keys? = null
@@ -85,6 +87,26 @@ object Analytics {
         signal(name, params)
     }
 
+    /**
+     * Times [block] as a span in Sentry's traces (like "http.client" / "POST api.peatus.ee stop"): inside the screen
+     * that's loading when there is one, else on its own. [description] must not identify anyone. Just runs [block]
+     * unless the user opted in. Any thread.
+     */
+    fun <T> timed(operation: String, description: String, block: () -> T): T {
+        if (!Sentry.isEnabled()) return block()
+        val span = Sentry.getSpan()?.takeUnless { it.isFinished }?.startChild(operation, description)
+            ?: Sentry.startTransaction(description, operation)
+        try {
+            return block().also { span.status = SpanStatus.OK }
+        } catch (e: Throwable) {
+            span.throwable = e
+            span.status = SpanStatus.INTERNAL_ERROR
+            throw e
+        } finally {
+            span.finish()
+        }
+    }
+
     /** What led up to a crash, attached to its report: the app's log lines ([AppLog]). */
     internal fun breadcrumb(message: String) {
         if (Sentry.isEnabled()) Sentry.addBreadcrumb(message)
@@ -102,6 +124,9 @@ object Analytics {
             options.isEnableUserInteractionBreadcrumbs = false
             // The usage counts ([signal]).
             options.metrics.isEnabled = true
+            // Traces: app start, screen loads with slow and frozen frames, and the requests timed by [timed]. A
+            // sample in releases keeps within the free plan.
+            options.tracesSampleRate = if (keys.debug) 1.0 else TRACES_SAMPLE_RATE
         }
     }
 
