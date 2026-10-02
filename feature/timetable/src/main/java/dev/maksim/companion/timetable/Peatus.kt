@@ -36,6 +36,8 @@ data class Line(val name: String, val mode: String)
 
 data class Departure(
     val tripId: String,
+    /** The route's GTFS id, e.g. "estonia:tallinna-lin_bus_41-1". */
+    val routeId: String,
     /** Route short name, e.g. "5" or "T4". */
     val route: String,
     val mode: String,
@@ -139,7 +141,7 @@ class PeatusClient {
             }
         """
         val data = request(query, lateVariables().put("id", id).put("n", departures + EXTRA_FOR_ARRIVALS))
-        return data.optJSONObject("stop")?.let { withLive(it, departures) }
+        return data.optJSONObject("stop")?.let { withLive(it, departures, nightDepartures(it, NIGHT_AHEAD_S)) }
     }
 
     /**
@@ -155,7 +157,33 @@ class PeatusClient {
         """
         val n = if (max >= ALL_DEPARTURES) ALL_DEPARTURES else max + EXTRA_FOR_ARRIVALS
         val data = request(query, lateVariables().put("id", id).put("range", seconds).put("n", n))
-        return data.optJSONObject("stop")?.let { withLive(it, max) }
+        return data.optJSONObject("stop")?.let { withLive(it, max, nightDepartures(it, seconds)) }
+    }
+
+    /**
+     * Tonight's departures of Tallinn's night buses from the stop in [json], due in the next [seconds] or late, if it
+     * has any. peatus.ee has them a day late ([nightShift]), so they're a day further on in its timetable. Only asked
+     * for while they may be running: at night, or when the next [seconds] run into it.
+     */
+    private fun nightDepartures(json: JSONObject, seconds: Int): List<Departure> {
+        if (json.optJSONArray("routes")?.objects().orEmpty().none { isNight(it.optString("gtfsId")) }) return emptyList()
+        val now = System.currentTimeMillis() / 1000
+        val night = Estonia.format("H", now * 1000, Locale.ROOT).toInt() < NIGHT_ENDS_H
+        if (!night && now + seconds < Estonia.dayStart(1) / 1000) return emptyList()
+        val query = """
+            query(${'$'}id: String!, ${'$'}start: Long!, ${'$'}range: Int!) {
+              stop(id: ${'$'}id) {
+                gtfsId name
+                stoptimesWithoutPatterns(startTime: ${'$'}start, timeRange: ${'$'}range, numberOfDepartures: 100,
+                  omitNonPickups: true) { $DEPARTURE }
+              }
+            }
+        """
+        val variables = JSONObject().put("id", json.getString("gtfsId"))
+            .put("start", now - LATE_S + NIGHT_SHIFT_S).put("range", LATE_S + seconds)
+        val stop = runCatching { request(query, variables) }.getOrNull()?.optJSONObject("stop") ?: return emptyList()
+        return departuresOf(stop, "stoptimesWithoutPatterns")
+            .filter { isNight(it.routeId) }
     }
 
     /** Stops whose name contains [name], in Estonia and still served. */
@@ -215,7 +243,7 @@ class PeatusClient {
                 // Several patterns (e.g. short turns) can share route and headsign; show them as one.
                 val key = Triple(shortName, headsign, mode)
                 byDirection.getOrPut(key) { mutableListOf() } +=
-                    RouteTime(time.getInt("scheduledDeparture"), tripId, time.getLong("serviceDay"))
+                    RouteTime(time.getInt("scheduledDeparture") - nightShift(route), tripId, time.getLong("serviceDay"))
                 longNames[key] = route.optString("longName")
             }
         }
@@ -276,8 +304,8 @@ class PeatusClient {
             stops = times.map {
                 TripStop(
                     stopOf(it.getJSONObject("stop"), 0),
-                    it.getInt("scheduledDeparture"),
-                    it.getInt("realtimeDeparture"),
+                    it.getInt("scheduledDeparture") - nightShift(route),
+                    it.getInt("realtimeDeparture") - nightShift(route),
                     it.optBoolean("realtime"),
                 )
             },
@@ -428,11 +456,17 @@ class PeatusClient {
         )
     }
 
-    /** The departures in the stop's [field], but for the ends of lines. */
-    private fun departuresOf(json: JSONObject, field: String): List<Departure> =
-        json.optJSONArray(field)?.objects().orEmpty()
+    /**
+     * The departures in the stop's [field], but for the ends of lines, and for night buses already gone: peatus.ee has
+     * them a day late ([nightShift]), so last night's would show up as if due now.
+     */
+    private fun departuresOf(json: JSONObject, field: String): List<Departure> {
+        val since = System.currentTimeMillis() - LATE_S * 1000L
+        return json.optJSONArray(field)?.objects().orEmpty()
             .filterNot { isArrival(json.getString("gtfsId"), json.getString("name"), it) }
             .map(::departureOf)
+            .filter { !isNight(it.routeId) || it.time >= since }
+    }
 
     /**
      * The stop in [json] with its next [max] departures, those of Tallinn's city lines and of county buses at the
@@ -440,17 +474,17 @@ class PeatusClient {
      * timetable, so one that's running late has gone from its next departures by now: that's what the [LATE] ones
      * are for. Without either feed, the timetable it is.
      */
-    private fun withLive(json: JSONObject, max: Int): Stop {
+    private fun withLive(json: JSONObject, max: Int, night: List<Departure> = emptyList()): Stop {
         val stop = stopOf(json, max)
         val routes = json.optJSONArray("routes")?.objects().orEmpty()
-        val all = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns"))
+        val all = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns") + night)
             .distinctBy { it.serviceDay to it.tripId }
         val city = if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) null
         else runCatching { tallinn.departures(stop) }.getOrNull()
         val county = if (routes.none { modeOf(it) == REGIONAL }) emptyMap()
         else runCatching { ridango.departures(stop, all.filter { it.mode == REGIONAL && !it.isRealtime }) }
             .getOrDefault(emptyMap())
-        if (city == null && county.isEmpty()) return stop
+        if (city == null && county.isEmpty() && night.isEmpty()) return stop
         val now = System.currentTimeMillis()
         val departures = all
             .map { departure ->
@@ -484,8 +518,10 @@ class PeatusClient {
     private fun departureOf(json: JSONObject): Departure {
         val trip = json.getJSONObject("trip")
         val route = trip.getJSONObject("route")
+        val shift = nightShift(route)
         return Departure(
             tripId = trip.getString("gtfsId"),
+            routeId = route.getString("gtfsId"),
             route = route.getString("shortName"),
             mode = modeOf(route),
             headsign = destination(
@@ -494,13 +530,23 @@ class PeatusClient {
                 trip.optJSONObject("arrivalStoptime")?.optJSONObject("stop")?.optNullableString("name"),
             ),
             serviceDay = json.getLong("serviceDay"),
-            scheduled = json.getInt("scheduledDeparture"),
-            expected = json.getInt("realtimeDeparture"),
+            scheduled = json.getInt("scheduledDeparture") - shift,
+            expected = json.getInt("realtimeDeparture") - shift,
             isRealtime = json.optBoolean("realtime"),
             tripStart = trip.optJSONObject("departureStoptime")?.takeIf { it.has("scheduledDeparture") }
-                ?.getInt("scheduledDeparture"),
+                ?.getInt("scheduledDeparture")?.minus(shift),
         )
     }
+
+    /**
+     * How much earlier than peatus.ee has them [route]'s trips leave, in seconds: a day for Tallinn's night buses
+     * ([isNight]), else nothing. Their trips are timetabled on the day after the night they run: the 96 leaving
+     * Vana-Pääsküla at 01:36 in the night to Saturday is on Saturday at 25:36, which would be Sunday's 01:36 (the
+     * city's live feed has it in the night to Saturday, to the second). So peatus.ee has none in the night to
+     * Saturday, and some that don't run in the night to Monday. The times are shifted, the trip and its service day
+     * aren't, so it's still found by them.
+     */
+    private fun nightShift(route: JSONObject) = if (isNight(route.optString("gtfsId"))) NIGHT_SHIFT_S else 0
 
     /**
      * The route's mode, except that buses are split further. The feed marks every trolleybus and every bus as BUS;
@@ -610,6 +656,17 @@ class PeatusClient {
 
         /** One that left a few seconds ago is probably still at the stop. */
         private const val LIVE_GRACE_MS = 30_000L
+
+        /**
+         * Tallinn's night buses, 91 to 96 ("ÖÖ Balti jaam - Priisle"), by route id: see [nightShift]. Line 9 is a day
+         * bus, so two digits.
+         */
+        private val NIGHT = Regex("""tallinna-lin_bus_9\d$""")
+        fun isNight(routeId: String) = NIGHT.containsMatchIn(routeId)
+        private const val NIGHT_SHIFT_S = 24 * 60 * 60
+
+        /** For [stop], which has no time range: how far ahead its night buses are looked for. */
+        private const val NIGHT_AHEAD_S = 2 * 60 * 60
 
         /** For [today]: until when yesterday's service may still be running. */
         private const val NIGHT_ENDS_H = 6

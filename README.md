@@ -110,6 +110,11 @@ reached from the widget or the main menu. OsmAnd starts those itself; Android do
 - OsmAnd keeps layers, widgets and buttons in memory only, so they're added again whenever OsmAnd (re)connects.
 - A trip's last stop is also a "departure" in the feed (towards the stop itself); those are dropped, by the trip's
   last stop rather than its headsign, since some headsigns are wrong.
+- **Night buses**: peatus.ee has Tallinn's night buses (91–96) a day late. The 96 leaving Vana-Pääsküla at 01:36 in
+  the night to Saturday is timetabled on Saturday at 25:36, which would be Sunday's 01:36; the city's live feed has
+  it in the night to Saturday, to the second. So their times are moved a day earlier everywhere (their trip and
+  service day stay, so they're still found by them), and at night a stop's departures are also asked for a day
+  ahead, where peatus.ee has tonight's. In the city's feed they're `nightbus` rather than `bus`.
 - **Destinations**: Elron's feed leaves the headsign out on some trips (R32 to Rakvere) and gives others the
   wrong one (R30 from Tallinn to Tapa says "Tallinn"). A headsign that's missing, or names where the trip starts
   rather than where it ends, is replaced by the trip's last stop.

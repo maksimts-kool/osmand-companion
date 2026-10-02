@@ -193,8 +193,13 @@ class TallinnLive {
         private const val STOP_LIST_MS = 24 * 60 * 60 * 1000L
         private const val STOP_LIST_RETRY_MS = 5 * 60 * 1000L
 
-        /** The feed's kinds of vehicle, as peatus.ee's modes ([PeatusClient.modeOf]). */
-        private val KINDS = mapOf("bus" to "BUS", "trol" to PeatusClient.TROLLEYBUS, "tram" to "TRAM")
+        /**
+         * The feed's kinds of vehicle, as peatus.ee's modes ([PeatusClient.modeOf]). The night buses (91–96) are
+         * "nightbus" in the feed, but city buses on peatus.ee ("estonia:tallinna-lin_bus_94").
+         */
+        private val KINDS = mapOf(
+            "bus" to "BUS", "nightbus" to "BUS", "trol" to PeatusClient.TROLLEYBUS, "tram" to "TRAM",
+        )
 
         /**
          * The feed's text was Windows-1257 once, turned into UTF-8 as if it were Latin-1: õ, ä, ö and ü are the
