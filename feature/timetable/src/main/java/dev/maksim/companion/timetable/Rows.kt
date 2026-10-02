@@ -17,6 +17,7 @@ import dev.maksim.companion.timetable.databinding.TtHeaderBinding
 import dev.maksim.companion.timetable.databinding.TtItemFactBinding
 import dev.maksim.companion.timetable.databinding.TtItemLineBinding
 import dev.maksim.companion.timetable.databinding.TtItemLiveFactBinding
+import dev.maksim.companion.timetable.databinding.TtItemOfflineFactBinding
 import dev.maksim.companion.timetable.databinding.TtItemRowBinding
 import dev.maksim.companion.timetable.databinding.TtItemSectionBinding
 
@@ -55,7 +56,8 @@ internal object Rows {
      * Fills the shared header of the stop and trip screens. [route] goes next to the vehicle icon in the badge;
      * [facts] are icon and text pairs shown as pills under the title. A stop shows its [lines] there instead, big
      * and in their own colors, as they're what you look for first; [onLine] makes them tappable, and those not in
-     * [running] are dimmed. A trip whose vehicle gives its times says so first, once for all its stops: [live].
+     * [running] are dimmed. A trip says first whether its vehicle gives its times, once for all its stops: [live],
+     * or with false that it doesn't (null for neither).
      */
     fun header(
         header: TtHeaderBinding,
@@ -67,7 +69,7 @@ internal object Rows {
         lines: List<Line> = emptyList(),
         running: Set<String>? = null,
         onLine: ((Line) -> Unit)? = null,
-        live: Boolean = false,
+        live: Boolean? = null,
     ) {
         val card = header.card
         card.setCardBackgroundColor(
@@ -88,14 +90,25 @@ internal object Rows {
         header.subtitle.text = subtitle
         header.subtitle.isVisible = !subtitle.isNullOrEmpty()
         header.facts.removeAllViews()
-        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty() || live
+        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty() || live != null
         val inflater = LayoutInflater.from(card.context)
-        if (live) TtItemLiveFactBinding.inflate(inflater, header.facts, true).run {
+        if (live == true) TtItemLiveFactBinding.inflate(inflater, header.facts, true).run {
             val green = card.context.getColor(R.color.tt_live)
             root.backgroundTintList = ColorStateList.valueOf(green).withAlpha(LIVE_FACT_ALPHA)
             text.text = card.context.getString(R.string.tt_live).replaceFirstChar { it.titlecase() }
             text.setTextColor(green)
             liveMark(this.live, true, green)
+        }
+        if (live == false) TtItemOfflineFactBinding.inflate(inflater, header.facts, true).run {
+            val grey = MaterialColors.getColor(card, com.google.android.material.R.attr.colorOnSurfaceVariant)
+            root.backgroundTintList = ColorStateList.valueOf(grey).withAlpha(OFFLINE_FACT_ALPHA)
+            text.text = card.context.getString(R.string.tt_offline).replaceFirstChar { it.titlecase() }
+            text.setTextColor(grey)
+            // The live mark with both its waves showing, still.
+            mark.setFrame(OFFLINE_MARK_FRAME)
+            val filter = PorterDuffColorFilter(grey, PorterDuff.Mode.SRC_ATOP)
+            mark.addValueCallback(KeyPath("**"), LottieProperty.COLOR_FILTER) { filter }
+            strike.strike()
         }
         for ((icon, text) in facts) TtItemFactBinding.inflate(inflater, header.facts, true).root.run {
             this.text = text
@@ -114,8 +127,12 @@ internal object Rows {
     /** A route with no departures on the chosen day. */
     private const val NOT_RUNNING_ALPHA = 0.4f
 
-    /** The live pill's green, behind its green text. */
+    /** The live pill's green, behind its green text; the offline one's grey. */
     private const val LIVE_FACT_ALPHA = 0x29
+    private const val OFFLINE_FACT_ALPHA = 0x1F
+
+    /** A frame of tt_anim_live where both waves are fully in (38 to 48). */
+    private const val OFFLINE_MARK_FRAME = 43
 
     /** A stop in a list: vehicle icon, name, and what serves it. */
     fun stop(parent: ViewGroup, stop: Stop, note: String?, onClick: () -> Unit) {

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leads a trip's header facts when its vehicle gives no times: the live mark, still and grey, struck through in
+     red, and "offline". The other side of tt_item_live_fact. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/tt_pill_bg"
+    android:gravity="center_vertical"
+    android:minHeight="32dp"
+    android:orientation="horizontal"
+    android:paddingStart="10dp"
+    android:paddingEnd="12dp"
+    android:paddingVertical="6dp">
+
+    <FrameLayout
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="6dp"
+        android:importantForAccessibility="noHideDescendants">
+
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/mark"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            app:lottie_rawRes="@raw/tt_anim_live" />
+
+        <dev.maksim.companion.timetable.StrikeView
+            android:id="@+id/strike"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:textStyle="bold" />
+</LinearLayout>

@@ -47,6 +47,7 @@
     <string name="tt_min_unit">мин</string>
     <string name="tt_in_h_min">%1$d ч %2$d мин</string>
     <string name="tt_live">онлайн</string>
+    <string name="tt_offline">офлайн</string>
 
     <string name="tt_today">Сегодня</string>
     <string name="tt_tomorrow">Завтра</string>

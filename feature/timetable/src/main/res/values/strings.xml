@@ -47,6 +47,7 @@
     <string name="tt_min_unit">min</string>
     <string name="tt_in_h_min">%1$d h %2$d min</string>
     <string name="tt_live">live</string>
+    <string name="tt_offline">offline</string>
 
     <string name="tt_today">Today</string>
     <string name="tt_tomorrow">Tomorrow</string>

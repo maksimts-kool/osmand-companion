@@ -21,4 +21,7 @@
     <!-- How late or early the vehicle is, on a trip's stops ahead: the small pill at the end of each one's ETA. -->
     <color name="tt_late">#E65100</color>
     <color name="tt_early">#1565C0</color>
+
+    <!-- The red line struck through the live mark on a trip without live times. -->
+    <color name="tt_offline_strike">#D32F2F</color>
 </resources>
