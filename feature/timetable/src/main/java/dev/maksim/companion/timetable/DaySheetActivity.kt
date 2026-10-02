@@ -198,7 +198,7 @@ class DaySheetActivity : AppCompatActivity() {
         background.execute {
             val result = runCatching {
                 if (showsNext) Loaded(peatus.stopWithin(stopId, NEXT_WITHIN_S, NEXT_DEPARTURES) ?: throw IOException(unknown), null)
-                else peatus.timetable(stopId, Estonia.serviceDate())?.let { (stop, routes) ->
+                else peatus.today(stopId)?.let { (stop, routes) ->
                     val next = runCatching { peatus.stopWithin(stopId, NEXT_WITHIN_S)?.departures }.getOrNull()
                     Loaded(stop, routes, next.orEmpty())
                 } ?: throw IOException(unknown)
@@ -275,15 +275,15 @@ class DaySheetActivity : AppCompatActivity() {
     }
 
     /** One of a route's times left today: when it leaves, live if [isRealtime]. */
-    private class Time(val tripId: String, val time: Long, val isRealtime: Boolean)
+    private class Time(val tripId: String, val serviceDay: Long, val time: Long, val isRealtime: Boolean)
 
     /** The times left, each at its live time if it's among the [live] next departures, as they leave. */
     private fun showDay(routes: List<RouteDay>, live: List<Departure>, now: Long) {
         val byTrip = live.filter { it.isRealtime }.associateBy { it.serviceDay to it.tripId }
         val left = routes.map { route ->
-            route to route.times.map { (seconds, tripId) ->
-                val departure = byTrip[route.serviceDay to tripId]
-                Time(tripId, departure?.time ?: TransitFormat.serviceTime(route.serviceDay, seconds), departure != null)
+            route to route.times.map { time ->
+                val departure = byTrip[time.serviceDay to time.tripId]
+                Time(time.tripId, time.serviceDay, departure?.time ?: time.time, departure != null)
             }.filter { it.time >= now - GRACE_MS }.sortedBy { it.time }
         }.filter { it.second.isNotEmpty() }
         left.sortedBy { (_, times) -> times.first().time }
@@ -314,7 +314,7 @@ class DaySheetActivity : AppCompatActivity() {
                     setTextColor(accent)
                 }
                 setOnClickListener {
-                    leaveFor(TripActivity.intent(this@DaySheetActivity, time.tripId, route.serviceDay, stopId))
+                    leaveFor(TripActivity.intent(this@DaySheetActivity, time.tripId, time.serviceDay, stopId))
                 }
             }
         }

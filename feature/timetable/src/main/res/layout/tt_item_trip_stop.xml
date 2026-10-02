@@ -41,7 +41,7 @@
             android:textAppearance="?attr/textAppearanceBodyLarge"
             tools:text="Balti jaam (train station)" />
 
-        <!-- "Your stop", "live · 2 min late"; hidden when there's nothing to say. -->
+        <!-- "Your stop"; hidden on the others. -->
         <TextView
             android:id="@+id/status"
             android:layout_width="match_parent"
@@ -54,41 +54,68 @@
             tools:visibility="visible" />
     </LinearLayout>
 
-    <!-- How soon; green, with the animated live mark, when it's the vehicle's own time. -->
+    <!-- How soon, in two parts: green, with the animated live mark, when it's the vehicle's own time; then how late
+         or early it is, tinted the same way in orange or blue. Each part has its own background, so the tints don't mix. -->
     <LinearLayout
         android:id="@+id/eta"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:background="@drawable/tt_pill_bg"
-        android:gravity="center_vertical"
-        android:minHeight="26dp"
-        android:orientation="horizontal"
-        android:paddingHorizontal="10dp"
-        android:paddingVertical="4dp">
+        android:orientation="horizontal">
 
-        <com.airbnb.lottie.LottieAnimationView
-            android:id="@+id/live"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:layout_marginEnd="4dp"
-            android:importantForAccessibility="no"
-            android:scaleType="fitCenter"
-            android:visibility="gone"
-            app:lottie_autoPlay="true"
-            app:lottie_loop="true"
-            app:lottie_rawRes="@raw/tt_anim_live"
-            tools:visibility="visible" />
-
-        <TextView
-            android:id="@+id/etaText"
+        <LinearLayout
+            android:id="@+id/etaMain"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="@drawable/tt_pill_bg"
+            android:gravity="center_vertical"
+            android:minHeight="26dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/live"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="4dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true"
+                app:lottie_rawRes="@raw/tt_anim_live"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/etaText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFeatureSettings="tnum"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceLabelMedium"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="11 min" />
+        </LinearLayout>
+
+        <!-- "+2": minutes late (or "−1" early); tinted in code. -->
+        <TextView
+            android:id="@+id/delay"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:background="@drawable/tt_pill_end_bg"
             android:fontFeatureSettings="tnum"
+            android:gravity="center"
             android:includeFontPadding="false"
             android:maxLines="1"
+            android:paddingStart="8dp"
+            android:paddingEnd="10dp"
             android:textAppearance="?attr/textAppearanceLabelMedium"
-            android:textColor="?attr/colorOnSurface"
-            tools:text="11 min" />
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:backgroundTint="#33E65100"
+            tools:text="+2"
+            tools:textColor="@color/tt_late"
+            tools:visibility="visible" />
     </LinearLayout>
 </LinearLayout>

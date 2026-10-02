@@ -87,7 +87,7 @@ class StopActivity : AppCompatActivity() {
      * A route's next departure: [tripId], its timetabled [scheduled] time, and when it actually leaves ([time]),
      * live when [isRealtime]. A late one still counts once its timetabled time has passed.
      */
-    private class Next(val tripId: String, val scheduled: Long, val time: Long, val isRealtime: Boolean)
+    private class Next(val tripId: String, val serviceDay: Long, val scheduled: Long, val time: Long, val isRealtime: Boolean)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -165,7 +165,8 @@ class StopActivity : AppCompatActivity() {
         binding.progress.isVisible = true
         background.execute {
             val result = runCatching {
-                val (stop, routes) = peatus.timetable(stopId, Estonia.serviceDate(day)) ?: throw IOException(unknown)
+                val (stop, routes) = (if (day == 0) peatus.today(stopId) else peatus.timetable(stopId, Estonia.serviceDate(day)))
+                    ?: throw IOException(unknown)
                 val next = if (day == 0) peatus.stopWithin(stopId, LIVE_WITHIN_S)?.departures else null
                 Triple(stop, routes, next)
             }
@@ -238,10 +239,9 @@ class StopActivity : AppCompatActivity() {
      * [live] next departures.
      */
     private fun dayOf(route: RouteDay, live: Map<Pair<Long, String>, Departure>): List<Next> =
-        route.times.map { (seconds, tripId) ->
-            val scheduled = TransitFormat.serviceTime(route.serviceDay, seconds)
-            val departure = live[route.serviceDay to tripId]
-            Next(tripId, scheduled, departure?.time ?: scheduled, departure?.isRealtime == true)
+        route.times.map { time ->
+            val departure = live[time.serviceDay to time.tripId]
+            Next(time.tripId, time.serviceDay, time.time, departure?.time ?: time.time, departure?.isRealtime == true)
         }.sortedBy { it.time }
 
     /**
@@ -258,8 +258,9 @@ class StopActivity : AppCompatActivity() {
         item.longName.text = route.longName
         addNextTimes(item, route, next, color, now)
 
-        // Service times can pass 24:00; the clock hour puts 25:10 under 01 at the end, as printed timetables do.
-        val hourOf = { time: Long -> Estonia.format("HH", time) }
+        // Service times can pass 24:00; the clock hour puts 25:10 under 01 at the end, as printed timetables do. By
+        // date too: after midnight, last night's 01 comes first, and tonight's at the end.
+        val hourOf = { time: Long -> Estonia.format("yyyyMMddHH", time) }
         val nextHour = upcoming?.let { hourOf(it.time) }
         val liveColor = getColor(R.color.tt_live)
         // The hours before the next departure's, hidden until the whole day is asked for.
@@ -267,7 +268,7 @@ class StopActivity : AppCompatActivity() {
         for ((hour, times) in day.groupBy { hourOf(it.time) }) {
             val line = TtItemHourBinding.inflate(layoutInflater, item.hours, true)
             if (nextHour != null && earlier.size == item.hours.childCount - 1 && hour != nextHour) earlier += line.root
-            line.hour.text = hour
+            line.hour.text = hour.takeLast(2)
             if (hour == nextHour) {
                 line.hour.backgroundTintList = color
                 line.hour.setTextColor(Color.WHITE)
@@ -280,7 +281,7 @@ class StopActivity : AppCompatActivity() {
                 minute.contentDescription = listOfNotNull(
                     TransitFormat.clock(departure.time), getString(R.string.tt_live).takeIf { departure.isRealtime },
                 ).joinToString(", ")
-                minute.setOnClickListener { openTrip(departure.tripId, route.serviceDay) }
+                minute.setOnClickListener { openTrip(departure.tripId, departure.serviceDay) }
                 if (departure.tripId == upcoming?.tripId) {
                     // Like the first of the next departures above it.
                     minute.setBackgroundResource(R.drawable.tt_minute_bg)
@@ -387,7 +388,7 @@ class StopActivity : AppCompatActivity() {
                     text.setTextColor(liveColor)
                 }
                 Rows.liveMark(live, departure.isRealtime, liveColor)
-                root.setOnClickListener { openTrip(departure.tripId, route.serviceDay) }
+                root.setOnClickListener { openTrip(departure.tripId, departure.serviceDay) }
             }
         }
     }

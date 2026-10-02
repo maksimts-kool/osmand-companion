@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Choreographer
 import android.view.View
+import android.view.animation.OvershootInterpolator
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnLayout
@@ -19,6 +21,8 @@ import dev.maksim.companion.timetable.databinding.TtItemTripStopBinding
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 
 /**
@@ -36,6 +40,21 @@ class TripActivity : AppCompatActivity() {
     /** As peatus.ee has it; [trip] is the same with the live times, refreshed while the screen is open. */
     private var timetable: Trip? = null
     private var trip: Trip? = null
+
+    /** The rows [render] drew, and the stop the vehicle had last left then ([Position.last]). */
+    private var rows: List<TtItemTripStopBinding> = emptyList()
+    private var renderedLast = -1
+
+    /** The vehicle, kept from one [render] to the next so it can glide ([glide]) to where it is now. */
+    private var vehicle: VehicleMarker? = null
+    private var vehicleX = 0f
+    private var vehicleY = 0f
+    private var shown = false
+    private var targetY = 0f
+
+    /** How late each stop ahead was last drawn ([showDelay]), by index, so only a change grows in; and the next one's. */
+    private var shownDelays: Map<Int, Int> = emptyMap()
+    private val delays = HashMap<Int, Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,7 +83,7 @@ class TripActivity : AppCompatActivity() {
 
     private fun refreshLive() {
         val timetable = timetable ?: return
-        if (!TallinnLive.covers(timetable.routeId)) return
+        if (!PeatusClient.mayGoLive(timetable)) return
         background.execute {
             val live = runCatching { peatus.live(timetable) }.getOrNull() ?: return@execute
             runOnUiThread {
@@ -75,14 +94,25 @@ class TripActivity : AppCompatActivity() {
         }
     }
 
+    /** Moves the vehicle on a little every second, between the [tick]s. */
+    private val follow = object : Runnable {
+        override fun run() {
+            moveVehicle()
+            binding.root.postDelayed(this, FOLLOW_MS)
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         binding.root.postDelayed(tick, TICK_MS)
+        binding.root.postDelayed(follow, FOLLOW_MS)
         background.execute { OsmAndRoute.clearLeftover(this, companion.osmand) }
     }
 
     override fun onStop() {
         binding.root.removeCallbacks(tick)
+        binding.root.removeCallbacks(follow)
+        glide.stop()
         super.onStop()
     }
 
@@ -125,9 +155,22 @@ class TripActivity : AppCompatActivity() {
     }
 
     /**
-     * Draws the trip as a line diagram, with the vehicle where it is now: between the last stop the city's feed
-     * no longer expects it at and the next, when there are live times, else where the timetable says.
+     * Where the vehicle is at [now]: it has left stop [last] (-1 before it sets off) and is [progress] of the way to
+     * the next. Between the last stop the city's feed no longer expects it at and the next, when there are live
+     * times, else where the times say.
      */
+    private data class Position(val last: Int, val progress: Float, val between: Boolean)
+
+    private fun positionOf(trip: Trip, now: Long): Position {
+        val times = trip.stops.map { it.time(trip.serviceDay) }
+        val last = if (trip.liveFrom >= 0) trip.liveFrom - 1 else times.indexOfLast { it <= now }
+        val between = last >= 0 && last < times.lastIndex
+        val progress = if (!between) 0f
+        else ((now - times[last]).toFloat() / max(1L, times[last + 1] - times[last])).coerceIn(0f, 1f)
+        return Position(last, progress, between)
+    }
+
+    /** Draws the trip as a line diagram, the vehicle on it where it is now ([moveVehicle]). */
     private fun render(scrollToFrom: Boolean) {
         val trip = trip ?: return
         val mode = Mode.of(trip.mode)
@@ -138,19 +181,16 @@ class TripActivity : AppCompatActivity() {
 
         val content = binding.content
         content.removeAllViews()
-        content.overlay.clear()
         val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
-        // The vehicle is between the last stop it has passed and the next; -1 before it sets off.
-        val last = if (trip.liveFrom >= 0) trip.liveFrom - 1 else times.indexOfLast { it <= now }
-        val between = last >= 0 && last < times.lastIndex
-        val progress = if (!between) 0f
-        else ((now - times[last]).toFloat() / max(1L, times[last + 1] - times[last])).coerceIn(0f, 1f)
+        val (last, progress, between) = positionOf(trip, now)
         val live = getColor(R.color.tt_live)
         var fromRow: View? = null
+        val rows = ArrayList<TtItemTripStopBinding>(trip.stops.size)
         for ((i, tripStop) in trip.stops.withIndex()) {
             val time = times[i]
             val passed = i <= last
             val row = TtItemTripStopBinding.inflate(layoutInflater, content, true)
+            rows += row
             row.time.text = TransitFormat.clock(time)
             if (tripStop.isRealtime) row.time.setTextColor(live)
             row.name.text = tripStop.stop.name
@@ -165,45 +205,32 @@ class TripActivity : AppCompatActivity() {
                 passedIn = if (passed) 1f else if (between && i == last + 1) progress * 2 - 1 else 0f
                 passedOut = if (!passed) 0f else if (between && i == last) progress * 2 else 1f
             }
-            // Where the vehicle is along this row, 0 at the top and 1 at the bottom. The halfway point between two
-            // stops is the border between their rows.
-            val vehicleAt = when {
-                !between -> null
-                i == last && progress < 0.5f -> 0.5f + progress
-                i == last + 1 && progress >= 0.5f -> progress - 0.5f
-                else -> null
-            }
-            vehicleAt?.let { at -> placeVehicle(row, at, mode) }
-
-            val status = mutableListOf<String>()
-            val delay = (tripStop.expected - tripStop.scheduled) / 60
-            if (tripStop.isRealtime) status += getString(R.string.tt_live)
-            if (delay > 0) status += getString(R.string.tt_late, delay)
-            if (delay < 0) status += getString(R.string.tt_early, -delay)
-            if (tripStop.stop.id == fromStopId) {
-                status.add(0, getString(R.string.tt_your_stop))
+            // That it's live is said once, in the header; how late, at the end of each stop's ETA.
+            val yours = tripStop.stop.id == fromStopId
+            if (yours) {
                 row.root.setBackgroundResource(R.drawable.tt_row_highlight_bg)
                 row.root.backgroundTintList = color.withAlpha(0x26)
                 row.line.emphasized = true
                 row.name.setTypeface(row.name.typeface, Typeface.BOLD)
                 row.time.setTypeface(row.time.typeface, Typeface.BOLD)
-                row.status.setTextColor(if (delay > 0) LATE else mode.color)
+                row.status.setText(R.string.tt_your_stop)
+                row.status.setTextColor(mode.color)
                 fromRow = row.root
-            } else if (delay > 0) {
-                row.status.setTextColor(LATE)
             }
-            row.status.text = status.joinToString(" · ")
-            row.status.isVisible = status.isNotEmpty()
+            row.status.isVisible = yours
 
             // Only the stops still ahead; ahead of a late vehicle too, though their time has passed.
             val soon = TransitFormat.relative(this, time, now)?.takeIf { !passed && (time >= now || trip.liveFrom >= 0) }
             row.etaText.text = soon
             row.eta.isVisible = soon != null
-            row.eta.backgroundTintList =
-                if (tripStop.isRealtime) ColorStateList.valueOf(live).withAlpha(if (i == last + 1) 0x40 else 0x1F)
+            // The next stop's stronger.
+            val tint = if (i == last + 1) 0x40 else 0x1F
+            row.etaMain.backgroundTintList =
+                if (tripStop.isRealtime) ColorStateList.valueOf(live).withAlpha(tint)
                 else color.withAlpha(if (i == last + 1) 0x40 else 0x1A)
             if (tripStop.isRealtime) row.etaText.setTextColor(live)
             Rows.liveMark(row.live, tripStop.isRealtime && soon != null, live)
+            showDelay(row, i, (tripStop.expected - tripStop.scheduled) / 60, soon != null, tint)
             if (passed) {
                 row.time.alpha = PAST_ALPHA
                 row.name.alpha = PAST_ALPHA
@@ -212,19 +239,113 @@ class TripActivity : AppCompatActivity() {
                 startActivity(StopActivity.intent(this@TripActivity, tripStop.stop.id, tripStop.stop.name, OpenedScreens.now()))
             }
         }
+        this.rows = rows
+        renderedLast = last
+        shownDelays = delays.toMap()
+        delays.clear()
+        if (vehicle == null) vehicle = VehicleMarker(this, mode)
+        content.doOnLayout { moveVehicle() }
         // Start at the stop you came from, with a couple of stops before it in view.
         if (scrollToFrom) fromRow?.let { row ->
             binding.scroll.post { binding.scroll.scrollTo(0, maxOf(0, row.top - row.height * 2)) }
         }
     }
 
-    /** Puts the vehicle [at] that far down [row]'s piece of the line, over the rows, once they're laid out. */
-    private fun placeVehicle(row: TtItemTripStopBinding, at: Float, mode: Mode) {
-        val marker = VehicleMarker(this, mode)
-        row.root.doOnLayout {
-            val line = row.line
-            marker.moveTo(row.root.left + line.left + line.width / 2f, row.root.top + line.top + line.height * at)
+    /**
+     * The minutes [row] (stop [i]) is [delay] late, early if less than 0, as the second part of its ETA chip ([shown]
+     * if it has one), like the first: "+2" in orange, "−1" in blue, on a [tint] of the same. Nothing when on time. It
+     * grows out of the chip's end when it first shows or changes, but not again on every redraw.
+     */
+    private fun showDelay(row: TtItemTripStopBinding, i: Int, delay: Int, shown: Boolean, tint: Int) {
+        val pill = row.delay
+        pill.isVisible = shown && delay != 0
+        row.etaMain.setBackgroundResource(if (pill.isVisible) R.drawable.tt_pill_start_bg else R.drawable.tt_pill_bg)
+        if (!pill.isVisible) return
+        delays[i] = delay
+        val color = getColor(if (delay > 0) R.color.tt_late else R.color.tt_early)
+        pill.text = if (delay > 0) "+$delay" else "\u2212${-delay}"
+        pill.setTextColor(color)
+        pill.backgroundTintList = ColorStateList.valueOf(color).withAlpha(tint)
+        row.eta.contentDescription = listOf(
+            row.etaText.text,
+            getString(if (delay > 0) R.string.tt_late else R.string.tt_early, abs(delay)),
+        ).joinToString(", ")
+        if (shownDelays[i] == delay) return
+        // Grows out of the chip's end.
+        pill.alpha = 0f
+        pill.doOnLayout {
+            it.pivotX = it.width.toFloat()
+            it.scaleX = POP_FROM
+            it.animate().scaleX(1f).alpha(1f).setDuration(POP_MS).setInterpolator(OvershootInterpolator()).start()
+        }
+    }
+
+    /**
+     * Sets the vehicle off towards where it is now, on the line between the stop it last left and the next: it
+     * glides there ([glide]) rather than jumping, so it creeps along as time goes by, and when fresh live times
+     * put it somewhere else, it moves over to there. Once it has passed a stop, the rows are drawn again.
+     */
+    private fun moveVehicle() {
+        val trip = trip ?: return
+        val marker = vehicle ?: return
+        val position = positionOf(trip, System.currentTimeMillis())
+        if (position.last != renderedLast) return render(scrollToFrom = false)
+        val from = rows.getOrNull(position.last)
+        val to = rows.getOrNull(position.last + 1)
+        // Rows just drawn again: it stays where it is until they're laid out.
+        if (from != null && to != null && (!from.root.isLaidOut || !to.root.isLaidOut)) return
+        if (!position.between || from == null || to == null) {
+            binding.content.overlay.remove(marker)
+            shown = false
+            glide.stop()
+            return
+        }
+        fun centerY(row: TtItemTripStopBinding) = row.root.top + row.line.top + row.line.height / 2f
+        vehicleX = from.root.left + from.line.left + from.line.width / 2f
+        targetY = centerY(from) + (centerY(to) - centerY(from)) * position.progress
+        if (!shown) {
+            // Where it is to begin with; from then on, it glides.
+            vehicleY = targetY
+            marker.moveTo(vehicleX, vehicleY)
             binding.content.overlay.add(marker)
+            shown = true
+        } else {
+            glide.start()
+        }
+    }
+
+    /**
+     * Brings the vehicle to [targetY] a frame at a time, quickly at first and slowing down as it gets there, and stops
+     * once it's there: in between the seconds of [follow], nothing is drawn.
+     */
+    private val glide = object : Choreographer.FrameCallback {
+        private var running = false
+        private var lastFrame = 0L
+
+        fun start() {
+            if (running || abs(targetY - vehicleY) < SETTLED_PX) return
+            running = true
+            lastFrame = 0L
+            Choreographer.getInstance().postFrameCallback(this)
+        }
+
+        fun stop() {
+            running = false
+            Choreographer.getInstance().removeFrameCallback(this)
+        }
+
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!running) return
+            val elapsedMs = if (lastFrame == 0L) FRAME_MS else (frameTimeNanos - lastFrame) / 1_000_000f
+            lastFrame = frameTimeNanos
+            vehicleY += (targetY - vehicleY) * (1 - exp(-elapsedMs / GLIDE_MS))
+            if (abs(targetY - vehicleY) < SETTLED_PX) {
+                vehicleY = targetY
+                running = false
+            } else {
+                Choreographer.getInstance().postFrameCallback(this)
+            }
+            vehicle?.moveTo(vehicleX, vehicleY)
         }
     }
 
@@ -318,6 +439,7 @@ class TripActivity : AppCompatActivity() {
                     if (minutes < 60) getString(R.string.tt_in_min, minutes.toInt())
                     else getString(R.string.tt_in_h_min, (minutes / 60).toInt(), (minutes % 60).toInt()),
             ),
+            live = trip.stops.any { it.isRealtime },
         )
     }
 
@@ -326,6 +448,12 @@ class TripActivity : AppCompatActivity() {
         private const val EXTRA_SERVICE_DAY = "service_day"
         private const val EXTRA_FROM_STOP_ID = "from_stop_id"
         private const val TICK_MS = 30_000L
+
+        /** How often the vehicle is moved on ([follow]), and how it glides there ([glide]). */
+        private const val FOLLOW_MS = 1_000L
+        private const val GLIDE_MS = 250f
+        private const val FRAME_MS = 16f
+        private const val SETTLED_PX = 0.1f
         private const val PAST_ALPHA = 0.5f
         private const val FADE_MS = 200L
 
@@ -334,7 +462,10 @@ class TripActivity : AppCompatActivity() {
 
         /** What OSM had for each route this session, so asking again doesn't bother Overpass. */
         private val checks = java.util.concurrent.ConcurrentHashMap<String, OsmRouteCheck.Result>()
-        private const val LATE = 0xFFE65100.toInt()
+
+        /** How [showDelay]'s part grows in. */
+        private const val POP_FROM = 0.4f
+        private const val POP_MS = 350L
 
         fun intent(context: Context, tripId: String, serviceDay: Long, fromStopId: String?): Intent =
             Intent(context, TripActivity::class.java)

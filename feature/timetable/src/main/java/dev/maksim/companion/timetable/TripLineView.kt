@@ -11,7 +11,10 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.withTranslation
 import com.google.android.material.color.MaterialColors
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * One stop's piece of a trip's line diagram: the line coming from the stop before, the stop's dot, and the
@@ -100,22 +103,28 @@ class VehicleMarker(context: Context, mode: Mode) : Drawable() {
     /** Its size across, ring included. */
     val size = ((RADIUS_DP + RING_DP) * 2 * density).toInt()
 
+    /** Its center in the overlay's view; to the fraction of a pixel, so it glides rather than steps. */
+    private var cx = 0f
+    private var cy = 0f
+
     /** Centers it on [x], [y] in the overlay's view. */
     fun moveTo(x: Float, y: Float) {
-        setBounds((x - size / 2f).toInt(), (y - size / 2f).toInt(), (x + size / 2f).toInt(), (y + size / 2f).toInt())
+        cx = x
+        cy = y
+        val half = size / 2f
+        setBounds(floor(x - half).toInt(), floor(y - half).toInt(), ceil(x + half).toInt(), ceil(y + half).toInt())
+        invalidateSelf()
     }
 
     override fun draw(canvas: Canvas) {
-        val cx = bounds.exactCenterX()
-        val cy = bounds.exactCenterY()
         val r = RADIUS_DP * density
         fill.color = surface
         canvas.drawCircle(cx, cy, r + RING_DP * density, fill)
         fill.color = color
         canvas.drawCircle(cx, cy, r, fill)
         val ir = (r * ICON_SCALE).toInt()
-        icon.setBounds(cx.toInt() - ir, cy.toInt() - ir, cx.toInt() + ir, cy.toInt() + ir)
-        icon.draw(canvas)
+        icon.setBounds(-ir, -ir, ir, ir)
+        canvas.withTranslation(cx, cy) { icon.draw(this) }
     }
 
     override fun setAlpha(alpha: Int) {}

@@ -61,10 +61,17 @@ data class RouteDay(
     val mode: String,
     val headsign: String,
     val longName: String,
-    val serviceDay: Long,
-    /** Seconds from [serviceDay], ascending, with the trip each one belongs to. */
-    val times: List<Pair<Int, String>>,
+    /** In the order they leave. */
+    val times: List<RouteTime>,
 )
+
+/**
+ * One of a [RouteDay]'s departures: [seconds] from its trip's [serviceDay], which can pass 24 h. Mostly the day's
+ * own, but [PeatusClient.today] adds the night's from the day before.
+ */
+data class RouteTime(val seconds: Int, val tripId: String, val serviceDay: Long) {
+    val time: Long get() = (serviceDay + seconds) * 1000
+}
 
 data class Trip(
     val id: String,
@@ -93,13 +100,15 @@ data class TripStop(val stop: Stop, val scheduled: Int, val expected: Int, val i
  * Client for peatus.ee, the Estonian Transport Administration's journey planner. It runs OpenTripPlanner
  * on the national GTFS feed (every bus, tram, train and ferry in Estonia), so one GraphQL endpoint answers
  * "which stops are here", "what leaves next" and "what's the whole timetable". Its live times are only where
- * operators send them; Tallinn's city buses, trolleybuses and trams get theirs from the city ([TallinnLive]) instead.
+ * operators send them; Tallinn's city buses, trolleybuses and trams get theirs from the city ([TallinnLive]) instead,
+ * and Harjumaa's county buses from Ridango ([RidangoLive]).
  *
  * Blocking: call it off the main thread.
  */
 class PeatusClient {
 
     private val tallinn = TallinnLive()
+    private val ridango = RidangoLive()
 
     /** Stops within [radius] m, nearest first, each with its next [departures] departures. */
     fun nearbyStops(lat: Double, lon: Double, radius: Int, max: Int, departures: Int): List<Stop> {
@@ -178,8 +187,8 @@ class PeatusClient {
         val json = request(query, JSONObject().put("id", stopId).put("date", date)).optJSONObject("stop")
             ?: return null
         val stop = stopOf(json, 0)
-        val byDirection = LinkedHashMap<Triple<String, String, String>, MutableList<Pair<Int, String>>>()
-        val details = HashMap<Triple<String, String, String>, Pair<String, Long>>()
+        val byDirection = LinkedHashMap<Triple<String, String, String>, MutableList<RouteTime>>()
+        val longNames = HashMap<Triple<String, String, String>, String>()
         for (pattern in json.getJSONArray("stoptimesForServiceDate").objects()) {
             val info = pattern.getJSONObject("pattern")
             val route = info.getJSONObject("route")
@@ -205,15 +214,36 @@ class PeatusClient {
                 if (last == null && isArrival(stop.name, headsign)) continue
                 // Several patterns (e.g. short turns) can share route and headsign; show them as one.
                 val key = Triple(shortName, headsign, mode)
-                byDirection.getOrPut(key) { mutableListOf() } += time.getInt("scheduledDeparture") to tripId
-                details[key] = route.optString("longName") to time.getLong("serviceDay")
+                byDirection.getOrPut(key) { mutableListOf() } +=
+                    RouteTime(time.getInt("scheduledDeparture"), tripId, time.getLong("serviceDay"))
+                longNames[key] = route.optString("longName")
             }
         }
         val days = byDirection.map { (key, times) ->
-            val (longName, serviceDay) = details.getValue(key)
-            RouteDay(key.first, key.third, key.second, longName, serviceDay, times.sortedBy { it.first })
+            RouteDay(key.first, key.third, key.second, longNames.getValue(key), times.sortedBy { it.time })
         }.sortedWith(compareBy(RouteOrder) { it.route })
         return stop to days
+    }
+
+    /**
+     * Today's [timetable] at [stopId], with yesterday's runs after midnight in it while it's night: the last buses
+     * of the evening are timetabled on the day they started (25:04), so today's service day doesn't have them, and
+     * at 00:40 the next one would seem to be the first bus of the morning.
+     */
+    fun today(stopId: String): Pair<Stop, List<RouteDay>>? {
+        val today = timetable(stopId, Estonia.serviceDate()) ?: return null
+        if (Estonia.format("H", System.currentTimeMillis(), Locale.ROOT).toInt() >= NIGHT_ENDS_H) return today
+        val night = runCatching { timetable(stopId, Estonia.serviceDate(-1)) }.getOrNull()?.second.orEmpty()
+            .map { route -> route.copy(times = route.times.filter { it.seconds >= DAY_S }) }
+            .filter { it.times.isNotEmpty() }
+        if (night.isEmpty()) return today
+        val (stop, routes) = today
+        fun key(route: RouteDay) = Triple(route.route, route.headsign, route.mode)
+        val tonight = night.associateBy(::key)
+        val merged = routes.map { route ->
+            tonight[key(route)]?.let { route.copy(times = it.times + route.times) } ?: route
+        } + night.filter { route -> routes.none { key(it) == key(route) } }
+        return stop to merged.sortedWith(compareBy(RouteOrder) { it.route })
     }
 
     /** One run of a route on [date] (yyyyMMdd): every stop it calls at, with times. */
@@ -264,11 +294,13 @@ class PeatusClient {
      * stop it lists the trip at has its live time, on time too.
      *
      * So it only asks about enough stops to find that first one ([findVehicle]), among those the vehicle may be at
-     * or near: from [LATE_S] behind the timetable to [TRIP_AHEAD_S] ahead of it. The stops ahead it didn't ask
-     * about, in that window, are live with the delay of the one before, as the feed would have them; those it says
-     * nothing about, or further ahead, get that delay on their timetable.
+     * or near: from [LATE_S] behind the timetable to [TRIP_AHEAD_S] ahead of it. The stops ahead of the vehicle the
+     * feed doesn't give a time for, in that window, are live with the delay of the one before: those it wasn't asked
+     * about, those past its hour or so of predictions, and the last stop, which it never lists (nothing departs
+     * from there towards it). Further ahead, they get that delay on their timetable.
      */
     fun live(trip: Trip): Trip {
+        if (trip.mode == REGIONAL) return countyLive(trip)
         if (!TallinnLive.covers(trip.routeId)) return trip
         val now = System.currentTimeMillis() / 1000
         val near = trip.stops.indices.filter { trip.serviceDay + trip.stops[it].scheduled in now - LATE_S..now + TRIP_AHEAD_S }
@@ -307,11 +339,31 @@ class PeatusClient {
                     // The city's timetable is to the second, so how late it is comes out right.
                     stop.copy(scheduled = scheduled, expected = expected, isRealtime = true)
                 }
-                i !in asked && i in near.first()..near.last() -> stop.copy(expected = stop.scheduled + delay, isRealtime = true)
+                i in near.first()..near.last() -> stop.copy(expected = stop.scheduled + delay, isRealtime = true)
                 else -> stop.copy(expected = stop.scheduled + delay)
             }
         }
         return trip.copy(stops = stops, liveFrom = first)
+    }
+
+    /**
+     * [trip], a county bus's, at the times its vehicle gives Ridango ([RidangoLive]), unless peatus.ee has them
+     * already. Ridango has the whole trip at once, the stops the vehicle has left included, so the times say where
+     * it is.
+     */
+    private fun countyLive(trip: Trip): Trip {
+        if (trip.stops.any { it.isRealtime }) return trip
+        // Noon of the service day is safely inside it, even on the days clocks change.
+        val date = Estonia.format("yyyyMMdd", trip.serviceDay * 1000 + 12 * 60 * 60 * 1000L)
+        val times = ridango.trip(trip.id, date)?.takeIf { times -> times.any { it.isRealtime } } ?: return trip
+        // The same feed, so the same stops in the same order; unless one of them has changed since.
+        fun same(time: RidangoLive.StopTime?, stop: TripStop) =
+            time != null && time.scheduled == stop.scheduled && (time.code == null || time.code == stop.stop.code)
+        val stops = trip.stops.mapIndexed { i, stop ->
+            val time = times.getOrNull(i)?.takeIf { same(it, stop) } ?: times.firstOrNull { same(it, stop) }
+            if (time?.isRealtime == true) stop.copy(expected = time.expected, isRealtime = true) else stop
+        }
+        return trip.copy(stops = stops)
     }
 
     /**
@@ -383,22 +435,29 @@ class PeatusClient {
             .map(::departureOf)
 
     /**
-     * The stop in [json] with its next [max] departures, those of Tallinn's city lines at the times their
-     * vehicles give ([TallinnLive]), which peatus.ee doesn't have. It only knows the timetable, so one that's
-     * running late has gone from its next departures by now: that's what the [LATE] ones are for. Without the
-     * city's feed, the timetable it is.
+     * The stop in [json] with its next [max] departures, those of Tallinn's city lines and of county buses at the
+     * times their vehicles give ([TallinnLive], [RidangoLive]), which peatus.ee doesn't have. It only knows the
+     * timetable, so one that's running late has gone from its next departures by now: that's what the [LATE] ones
+     * are for. Without either feed, the timetable it is.
      */
     private fun withLive(json: JSONObject, max: Int): Stop {
         val stop = stopOf(json, max)
         val routes = json.optJSONArray("routes")?.objects().orEmpty()
-        if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) return stop
-        val live = runCatching { tallinn.departures(stop) }.getOrNull() ?: return stop
-        val now = System.currentTimeMillis()
-        val departures = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns"))
+        val all = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns"))
             .distinctBy { it.serviceDay to it.tripId }
+        val city = if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) null
+        else runCatching { tallinn.departures(stop) }.getOrNull()
+        val county = if (routes.none { modeOf(it) == REGIONAL }) emptyMap()
+        else runCatching { ridango.departures(stop, all.filter { it.mode == REGIONAL && !it.isRealtime }) }
+            .getOrDefault(emptyMap())
+        if (city == null && county.isEmpty()) return stop
+        val now = System.currentTimeMillis()
+        val departures = all
             .map { departure ->
                 if (departure.isRealtime) return@map departure
                 val serviceDay = departure.serviceDay
+                county[serviceDay to departure.tripId]?.let { return@map departure.copy(expected = it, isRealtime = true) }
+                val live = city ?: return@map departure
                 val time = live.find(departure.route, departure.mode, departure.headsign, serviceDay + departure.scheduled)
                     ?: return@map departure
                 // Only once the trip is on its way: before, the feed's times for it are its vehicle's guess from the
@@ -499,39 +558,15 @@ class PeatusClient {
         return Analytics.timed("http.client", "POST api.peatus.ee $field") { post(query, variables) }
     }
 
-    private fun post(query: String, variables: JSONObject): JSONObject {
-        val body = JSONObject().put("query", query.trimIndent()).put("variables", variables).toString()
-        val connection = URL(ENDPOINT).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 20_000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.outputStream.use { it.write(body.toByteArray()) }
-
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) throw IOException("peatus.ee: HTTP $code")
-            val json = try {
-                JSONObject(text)
-            } catch (e: org.json.JSONException) {
-                throw IOException("peatus.ee: unreadable answer", e)
-            }
-            json.optJSONArray("errors")?.let { errors ->
-                throw IOException("peatus.ee: " + errors.objects().joinToString { it.optString("message") })
-            }
-            return json.getJSONObject("data")
-        } finally {
-            connection.disconnect()
-        }
-    }
+    private fun post(query: String, variables: JSONObject): JSONObject = graphQL(ENDPOINT, "peatus.ee", query, variables)
 
     companion object {
         /** Our own modes, alongside OpenTripPlanner's: see [modeOf]. */
         const val TROLLEYBUS = "TROLLEYBUS"
         const val REGIONAL = "REGIONAL"
+
+        /** Whether [live] may have live times for [trip] that peatus.ee doesn't. */
+        fun mayGoLive(trip: Trip) = trip.mode == REGIONAL || TallinnLive.covers(trip.routeId)
 
         private const val ENDPOINT = "https://api.peatus.ee/routing/v1/routers/estonia/index/graphql"
 
@@ -575,6 +610,10 @@ class PeatusClient {
 
         /** One that left a few seconds ago is probably still at the stop. */
         private const val LIVE_GRACE_MS = 30_000L
+
+        /** For [today]: until when yesterday's service may still be running. */
+        private const val NIGHT_ENDS_H = 6
+        private const val DAY_S = 24 * 60 * 60
 
         /** For [stopWithin]: as many as there are. */
         const val ALL_DEPARTURES = 1000
@@ -622,7 +661,40 @@ internal object Polyline {
     }
 }
 
-private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+/**
+ * Asks an OpenTripPlanner's GraphQL endpoint ([url]): peatus.ee's, or Ridango's ([RidangoLive]). [source] names it
+ * in errors.
+ */
+internal fun graphQL(url: String, source: String, query: String, variables: JSONObject): JSONObject {
+    val body = JSONObject().put("query", query.trimIndent()).put("variables", variables).toString()
+    val connection = URL(url).openConnection() as HttpURLConnection
+    try {
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 20_000
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        connection.outputStream.use { it.write(body.toByteArray()) }
 
-private fun JSONObject.optNullableString(name: String): String? =
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (code !in 200..299) throw IOException("$source: HTTP $code")
+        val json = try {
+            JSONObject(text)
+        } catch (e: org.json.JSONException) {
+            throw IOException("$source: unreadable answer", e)
+        }
+        json.optJSONArray("errors")?.let { errors ->
+            throw IOException("$source: " + errors.objects().joinToString { it.optString("message") })
+        }
+        return json.getJSONObject("data")
+    } finally {
+        connection.disconnect()
+    }
+}
+
+internal fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+
+internal fun JSONObject.optNullableString(name: String): String? =
     if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }

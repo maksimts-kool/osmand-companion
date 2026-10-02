@@ -16,6 +16,7 @@ import com.google.android.material.color.MaterialColors
 import dev.maksim.companion.timetable.databinding.TtHeaderBinding
 import dev.maksim.companion.timetable.databinding.TtItemFactBinding
 import dev.maksim.companion.timetable.databinding.TtItemLineBinding
+import dev.maksim.companion.timetable.databinding.TtItemLiveFactBinding
 import dev.maksim.companion.timetable.databinding.TtItemRowBinding
 import dev.maksim.companion.timetable.databinding.TtItemSectionBinding
 
@@ -54,7 +55,7 @@ internal object Rows {
      * Fills the shared header of the stop and trip screens. [route] goes next to the vehicle icon in the badge;
      * [facts] are icon and text pairs shown as pills under the title. A stop shows its [lines] there instead, big
      * and in their own colors, as they're what you look for first; [onLine] makes them tappable, and those not in
-     * [running] are dimmed.
+     * [running] are dimmed. A trip whose vehicle gives its times says so first, once for all its stops: [live].
      */
     fun header(
         header: TtHeaderBinding,
@@ -66,6 +67,7 @@ internal object Rows {
         lines: List<Line> = emptyList(),
         running: Set<String>? = null,
         onLine: ((Line) -> Unit)? = null,
+        live: Boolean = false,
     ) {
         val card = header.card
         card.setCardBackgroundColor(
@@ -86,8 +88,15 @@ internal object Rows {
         header.subtitle.text = subtitle
         header.subtitle.isVisible = !subtitle.isNullOrEmpty()
         header.facts.removeAllViews()
-        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty()
+        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty() || live
         val inflater = LayoutInflater.from(card.context)
+        if (live) TtItemLiveFactBinding.inflate(inflater, header.facts, true).run {
+            val green = card.context.getColor(R.color.tt_live)
+            root.backgroundTintList = ColorStateList.valueOf(green).withAlpha(LIVE_FACT_ALPHA)
+            text.text = card.context.getString(R.string.tt_live).replaceFirstChar { it.titlecase() }
+            text.setTextColor(green)
+            liveMark(this.live, true, green)
+        }
         for ((icon, text) in facts) TtItemFactBinding.inflate(inflater, header.facts, true).root.run {
             this.text = text
             setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
@@ -104,6 +113,9 @@ internal object Rows {
 
     /** A route with no departures on the chosen day. */
     private const val NOT_RUNNING_ALPHA = 0.4f
+
+    /** The live pill's green, behind its green text. */
+    private const val LIVE_FACT_ALPHA = 0x29
 
     /** A stop in a list: vehicle icon, name, and what serves it. */
     fun stop(parent: ViewGroup, stop: Stop, note: String?, onClick: () -> Unit) {

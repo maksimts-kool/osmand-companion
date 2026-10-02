@@ -39,12 +39,16 @@ In this app, a stop's header shows the routes serving it as big badges in their 
 run that day); tap one to jump to its timetable. Below is a card per route for today or any of the next 6 days,
 the route leaving soonest first. A card starts folded to one line of its next departures, so all the routes fit on
 screen: how soon the next one leaves, then the times after it, live where available (in green, with an animated
-live mark; Tallinn's city buses, trolleybuses and trams). The hours below show live times too, so a late bus is
+live mark; Tallinn's city buses, trolleybuses and trams, and Harjumaa's county buses). The hours below show live times too, so a late bus is
 under the minute it actually leaves, in green; today's live times refresh every 30 s. Tapping
 it unfolds the times from the next departure's hour on, laid out by hour like the timetables at Estonian stops,
-then the whole day, then folds it again. Routes done for today go last. Tap a departure or a minute to see
+then the whole day, then folds it again. Routes done for today go last. Until 6 in the morning, *Today* (and the
+*Full day* sheet) also has the night's last runs of the day before, timetabled past 24:00 (25:04), so at 00:40 the
+next bus isn't the first one of the morning. Tap a departure or a minute to see
 that trip: every stop along the route with its time (the route's timetable), live in green where the vehicle
-gives its times, with the vehicle drawn where the live times put it. *Show in OsmAnd* moves OsmAnd's map
+gives its times, with *Live* once in its header and how late or early (`+2`, `−1`) as the end part of each stop's ETA chip,
+with the vehicle drawn where the live times put it, gliding along as time goes by, and over to where fresh
+live times put it. *Show in OsmAnd* moves OsmAnd's map
 to the stop.
 
 ### Route on OsmAnd's map
@@ -86,12 +90,19 @@ reached from the widget or the main menu. OsmAnd starts those itself; Android do
   (Haabersti is `estonia:141510` on peatus.ee and 5877 in the feed). It's asked for a stop's next departures
   (the stop screen and both sheets) when a Tallinn city bus, trolleybus or tram serves the stop. The feed is per
   stop, so a trip's live times take one request per stop from 20 minutes behind its timetable to 90 minutes
-  ahead (the feed predicts about an hour ahead), 6 at a time, every 30 s while the trip is open; the stops after those get the last known delay, and those
+  ahead (the feed predicts about an hour ahead), 6 at a time, every 30 s while the trip is open; the stops after those (also those past the feed's hour, and the last stop, which it never lists) get the last known delay, and those
   before the first one the feed still lists the trip at are behind the vehicle. Its departures are matched to
   peatus.ee's by route, timetabled time (the feed's is to the second, peatus.ee's rounded down to the minute) and
   destination, as at the end of a line the vehicle arriving and the one leaving back can be due the same minute.
   A bus running late has already dropped out of peatus.ee's next departures, so those of the last 20 minutes are
   asked for too. If the feed doesn't answer, the timetable is shown as before.
+- **Live times of Harjumaa's county buses**: peatus.ee has none for those either, so `RidangoLive` gets them from
+  Ridango's OpenTripPlanner, the journey planner behind [iil.pilet.ee](https://iil.pilet.ee)
+  (`wmb-otp-peutk.eu-prod.ridango.cloud/otp/routers/1/index/graphql`). It runs on the same national feed and answers
+  the same GraphQL, with live times from the buses that send them (SEBE's, for one). Its trips are peatus.ee's with
+  `1:` for `estonia:`; its stops are by the code on the sign for some (`1:21207-1`) and by peatus.ee's number for
+  others, so a stop is asked for both ways at once, and the one with the stop's code wins. It's asked about a stop's
+  county bus departures (`REGIONAL`) when it has any, and about a trip's stops all at once when it's a county bus's.
 - **Following the map**: every 4 s `TimetableFeature` asks OsmAnd where its map is (`getAppInfo`). Only while the
   map is on screen and in Estonia, it loads the stops within 1.2 km. It loads again once the map moves 400 m,
   or after a minute for fresh departures. When OsmAnd is in the background, nothing is fetched.
@@ -151,7 +162,7 @@ All of it goes to [Sentry](https://sentry.io) (`sentry-android-core`, without ND
 - **Usage counts**: Sentry metrics (*Explore → Metrics*), counted by `Analytics.signal(name, params)`, which can
   be grouped by their parameters. No location, stops or searches.
 - **Traces** (*Explore → Traces*): app start, screen loads with slow and frozen frames, and requests to
-  peatus.ee (by query field, e.g. `POST api.peatus.ee stopsByRadius`), transport.tallinn.ee and Overpass, timed
+  peatus.ee (by query field, e.g. `POST api.peatus.ee stopsByRadius`), transport.tallinn.ee, Ridango and Overpass, timed
   by `Analytics.timed(...)`. Inside the screen loading at the time, else on their own. All in debug builds, 20% in
   releases. The screens OsmAnd opens are timed from the tap until they show what they're for, by
   `Analytics.screenLoad(...)`: the Next departures and Full day sheets (`Next departures sheet`, `Full day sheet`)

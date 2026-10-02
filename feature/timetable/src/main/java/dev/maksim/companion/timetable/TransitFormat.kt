@@ -85,9 +85,6 @@ object TransitFormat {
         if (Estonia.format("yyyyMMdd", time) == Estonia.format("yyyyMMdd", now)) clock(time)
         else Estonia.format("EEE HH:mm", time, locale)
 
-    /** A time from a timetable: seconds since the service day started, which can pass 24:00. */
-    fun serviceTime(serviceDay: Long, seconds: Int): Long = (serviceDay + seconds) * 1000
-
     /** "Bus stop · to Pelguranna, Väike-Õismäe": tells the two sides of a street apart. */
     fun stopType(context: Context, stop: Stop): String {
         val type = context.getString(R.string.tt_stop_type, context.getString(Mode.of(stop.mode).label))
