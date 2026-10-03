@@ -5,6 +5,7 @@ import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.BackgroundFeature
 import dev.maksim.companion.core.CompanionHost
 import dev.maksim.companion.core.OsmAndConnection
+import dev.maksim.companion.planner.TripFeature
 import dev.maksim.companion.timetable.TimetableFeature
 import dev.maksim.companion.update.Updater
 
@@ -22,6 +23,7 @@ class CompanionApp : Application(), CompanionHost {
         osmand = OsmAndConnection(this)
         features = listOf(
             TimetableFeature(this, osmand),
+            TripFeature(this, osmand),
         )
         osmand.connect()
         Updater.init(this)

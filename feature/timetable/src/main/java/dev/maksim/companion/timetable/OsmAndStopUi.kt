@@ -41,11 +41,13 @@ import java.util.Locale
  *
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
  *    has a switch for it). Tapping a stop shows its name, which way it goes, and when that was loaded;
- *  - two buttons in that menu: "Next departures" opens the live next departures in a sheet over the map
- *    ([DaySheetActivity]); "Full timetable" opens the stop's full timetable in this app;
+ *  - three buttons in that menu: "Next departures" opens the live next departures in a sheet over the map
+ *    ([DaySheetActivity]); "Full timetable" opens the stop's full timetable in this app; "Trip to here" opens this
+ *    app's trip planner with the stop as where to go;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
- *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
+ *  - "Transit timetables" and "Plan a trip" items in OsmAnd's main menu, which open the stop search and the trip
+ *    planner here.
  *
  * All of it is in OsmAnd's language ([strings]), which can differ from this app's.
  *
@@ -109,11 +111,12 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         }
         osmand.call("addMapWidget") { it.addMapWidget(AddMapWidgetParams(widget(NO_VALUE, null))) }
         // NEW_TASK: without it, Android 15+ won't bring this app's task to the front from OsmAnd's.
-        val item = NavDrawerItem(
-            strings.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK,
+        val items = listOf(
+            NavDrawerItem(strings.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK),
+            NavDrawerItem(strings.getString(R.string.tt_drawer_planner), PLANNER_LINK, PLANNER_ICON, Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         osmand.call("setNavDrawerItems") {
-            it.setNavDrawerItems(SetNavDrawerItemsParams(osmand.appPackage, listOf(item)))
+            it.setNavDrawerItems(SetNavDrawerItemsParams(osmand.appPackage, items))
         }
         return true
     }
@@ -264,6 +267,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         return listOf(
             row(BUTTON_DEPARTURES, R.string.tt_button_departures, "ic_action_update"),
             row(BUTTON_SHOW_IN_APP, R.string.tt_full_timetable, "ic_action_time"),
+            row(BUTTON_TRIP_TO, R.string.tt_button_trip_here, PLANNER_ICON),
         )
     }
 
@@ -280,6 +284,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     companion object {
         const val BUTTON_DEPARTURES = 1
         const val BUTTON_SHOW_IN_APP = 3
+        const val BUTTON_TRIP_TO = 4
 
         /** The Full day button's, before Full timetable took its place: see [register]. */
         private const val RETIRED_BUTTON_FULL_DAY = 2
@@ -289,6 +294,31 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
         fun deepLink(context: Context): Intent =
             Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK)).setPackage(context.packageName)
+
+        /**
+         * Opens this app's trip planner; OsmAnd's main menu item points here. With a place's [Place] query parameters
+         * ([plannerLink]), that's where to go.
+         */
+        const val PLANNER_LINK = "osmandcompanion://planner"
+
+        /** The planner's link with [name] at [lat], [lon] as where to go, from OsmAnd's [stopId] if it's a stop. */
+        fun plannerLink(context: Context, name: String, lat: Double, lon: Double, stopId: String?): Intent {
+            val uri = Uri.parse(PLANNER_LINK).buildUpon()
+                .appendQueryParameter(PARAM_NAME, name)
+                .appendQueryParameter(PARAM_LAT, lat.toString())
+                .appendQueryParameter(PARAM_LON, lon.toString())
+                .apply { stopId?.let { appendQueryParameter(PARAM_STOP, it) } }
+                .build()
+            return Intent(Intent.ACTION_VIEW, uri).setPackage(context.packageName)
+        }
+
+        const val PARAM_NAME = "name"
+        const val PARAM_LAT = "lat"
+        const val PARAM_LON = "lon"
+        const val PARAM_STOP = "stop"
+
+        /** OsmAnd's icon for its own directions. */
+        private const val PLANNER_ICON = "ic_action_gdirections_dark"
 
         /** [context] with its strings and dates in [locales]. */
         fun localized(context: Context, locales: LocaleList): Context =

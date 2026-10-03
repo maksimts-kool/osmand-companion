@@ -2,7 +2,7 @@
     <string name="tt_feature_title">Transit timetables</string>
     <string name="tt_intro">Timetables for every bus, tram, train and ferry stop in Estonia, from peatus.ee, right on OsmAnd\'s map.</string>
     <string name="tt_show_in_osmand_switch">Show timetables in OsmAnd</string>
-    <string name="tt_where_hint">• Map: tap a stop (zoom 13+), then Next departures or Full timetable. Hide stops in Configure map.\n• Widget: add Next departure in Configure screen.\n• Main menu → Transit timetables opens this screen.</string>
+    <string name="tt_where_hint">• Map: tap a stop (zoom 13+), then Next departures or Full timetable. Hide stops in Configure map.\n• Widget: add Next departure in Configure screen.\n• Main menu → Transit timetables opens this screen; Plan a trip opens the Trips tab.</string>
     <string name="tt_overlay_hint">Android only lets OsmAnd\'s Next departures and Full timetable buttons open right over OsmAnd if this app may display over other apps. Until then, they come as a notification to tap.</string>
     <string name="tt_overlay_allow">Allow</string>
     <string name="tt_search_hint">Find a stop</string>
@@ -14,6 +14,8 @@
 
     <string name="tt_layer_name">Transit timetables (peatus.ee)</string>
     <string name="tt_drawer_item">Transit timetables</string>
+    <string name="tt_drawer_planner">Plan a trip (live)</string>
+    <string name="tt_button_trip_here">Trip to here</string>
     <string name="tt_widget_title">Next departure (peatus.ee)</string>
     <string name="tt_widget_none">none today</string>
     <string name="tt_button_departures">Next departures</string>

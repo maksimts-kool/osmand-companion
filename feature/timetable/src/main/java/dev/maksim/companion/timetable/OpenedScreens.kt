@@ -12,9 +12,9 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * A screen that comes up after the feature gave up on it (a slow start) takes back the notification sent instead.
  */
-internal object OpenedScreens {
+object OpenedScreens {
 
-    enum class Screen { STOP, NEXT_SHEET }
+    enum class Screen { STOP, NEXT_SHEET, PLANNER }
 
     /** The notification that opens a screen Android didn't let us open directly; one at a time. */
     const val NOTIFICATION_ID = 2

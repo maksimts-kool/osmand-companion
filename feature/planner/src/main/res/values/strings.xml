@@ -1,0 +1,121 @@
+<resources>
+    <string name="pl_intro">Plans trips on live times: a bus that\'s running late and can still be caught counts, a connection that\'s gone doesn\'t. Live for Tallinn\'s buses, trolleybuses and trams and Harjumaa\'s county buses.</string>
+    <string name="pl_from">From</string>
+    <string name="pl_to">To</string>
+    <string name="pl_choose_from">Where from?</string>
+    <string name="pl_choose_to">Where to?</string>
+    <string name="pl_swap">Swap from and to</string>
+    <string name="pl_my_location">My location</string>
+    <string name="pl_my_location_detail">Where OsmAnd has you</string>
+    <string name="pl_osmand_destination">OsmAnd\'s destination</string>
+    <string name="pl_osmand_destination_detail">Where OsmAnd navigates to</string>
+    <string name="pl_map_center">OsmAnd\'s map center</string>
+    <string name="pl_map_center_detail">Where OsmAnd\'s map is</string>
+    <string name="pl_no_location">OsmAnd doesn\'t know where you are yet. Open OsmAnd, or pick a place.</string>
+
+    <string name="pl_leave_now">Leave now</string>
+    <string name="pl_depart_at">Depart %1$s</string>
+    <string name="pl_arrive_by">Arrive by %1$s</string>
+    <string name="pl_depart_pick">Depart at…</string>
+    <string name="pl_arrive_pick">Arrive by…</string>
+
+    <string name="pl_searching">Finding ways on live times…</string>
+    <string name="pl_needs_places">Choose where to go, and the ways there show up here.</string>
+    <string name="pl_nothing">No way there by public transport at that time.</string>
+    <string name="pl_failed">Couldn\'t plan the trip: %1$s</string>
+    <string name="pl_updated">Updated %1$s</string>
+    <string name="pl_updated_partly">Updated %1$s · %2$s didn\'t answer</string>
+    <string name="pl_source_tallinn">transport.tallinn.ee</string>
+    <string name="pl_source_ridango">Ridango</string>
+    <string name="pl_source_peatus">peatus.ee</string>
+
+    <string name="pl_leave_in">Leave in %1$s</string>
+    <string name="pl_leave_now_short">Leave now</string>
+    <string name="pl_leave_at">Leave at %1$s</string>
+    <string name="pl_get_off">Get off at %1$s</string>
+    <string name="pl_arrive">arrive %1$s</string>
+    <string name="pl_direct">direct</string>
+    <plurals name="pl_changes">
+        <item quantity="one">%1$d change</item>
+        <item quantity="other">%1$d changes</item>
+    </plurals>
+    <string name="pl_walk_m">%1$d m on foot</string>
+    <string name="pl_walk_only">Walk all the way</string>
+    <string name="pl_ride_from">%1$s %2$s from %3$s at %4$s</string>
+    <string name="pl_change_tight">Only %1$s to change at %2$s</string>
+    <string name="pl_change_missed">The connection at %1$s is missed</string>
+    <string name="pl_replaced">The planned %1$s can\'t be caught any more: the next one instead</string>
+    <string name="pl_gone">%1$s has already left %2$s</string>
+    <string name="pl_late_start">Leave now: %1$s is due as you get there</string>
+
+    <string name="pl_title">→ %1$s</string>
+    <string name="pl_subtitle_from">from %1$s</string>
+    <string name="pl_walk_to">Walk %1$s to %2$s</string>
+    <string name="pl_walk">Walk %1$s</string>
+    <string name="pl_walk_distance">%1$d m</string>
+    <string name="pl_change_margin">%1$s to change</string>
+    <string name="pl_change_margin_missed">Missed by %1$s</string>
+    <plurals name="pl_stops_between">
+        <item quantity="one">%1$d stop on the way</item>
+        <item quantity="other">%1$d stops on the way</item>
+    </plurals>
+    <string name="pl_show_stops">Show the stops on the way</string>
+    <string name="pl_hide_stops">Hide them</string>
+    <string name="pl_show_in_osmand">Show in OsmAnd</string>
+    <string name="pl_walk_in_osmand">Walk there with OsmAnd</string>
+    <string name="pl_trip_layer">Trip (OsmAnd Companion)</string>
+    <string name="pl_trip_card">%1$s – %2$s · %3$s</string>
+    <string name="pl_trip_unknown">peatus.ee doesn\'t have this run, so its stops can\'t be shown.</string>
+    <string name="pl_replan">Find a new way</string>
+
+    <string name="pl_search_hint">Address, place or stop</string>
+    <string name="pl_recent">Recent</string>
+    <string name="pl_from_osmand">From OsmAnd</string>
+    <string name="pl_places">Places</string>
+    <string name="pl_search_empty">Nothing found for “%1$s”.</string>
+    <string name="pl_search_failed">Couldn\'t search peatus.ee: %1$s</string>
+
+    <string name="pl_trip_start">Start trip</string>
+    <string name="pl_trip_stop">Stop trip</string>
+    <string name="pl_trip_started">Trip started: it\'s in the notification. For OsmAnd\'s widget, add Trip (live) in OsmAnd → Configure screen.</string>
+    <string name="pl_trip_feature">Trip</string>
+    <string name="pl_trip_title">Trip to %1$s</string>
+    <string name="pl_trip_banner">On your way to %1$s</string>
+    <string name="pl_trip_open">Open</string>
+    <string name="pl_trip_new_way">New way</string>
+    <string name="pl_trip_channel">Trip being taken</string>
+    <string name="pl_trip_alerts_channel">Trip alerts</string>
+    <string name="pl_widget_title">Trip (live)</string>
+    <string name="pl_widget_leave">Leave · %1$s</string>
+    <string name="pl_widget_ride">%1$s · %2$s</string>
+    <string name="pl_widget_off">Off · %1$s</string>
+    <string name="pl_widget_walk">Walk · %1$s</string>
+
+    <string name="pl_step_catch">%1$s at %2$s</string>
+    <string name="pl_step_walk_to_catch">Walk %1$s to %2$s for %3$s</string>
+    <string name="pl_step_catch_at">%1$s from %2$s</string>
+    <string name="pl_step_wait">%1$s → %2$s at %3$s</string>
+    <string name="pl_step_wait_text">From %1$s, in %2$s</string>
+    <string name="pl_step_ride">Get off at %1$s at %2$s</string>
+    <plurals name="pl_stops_left">
+        <item quantity="one">%1$d stop to go</item>
+        <item quantity="other">%1$d stops to go</item>
+    </plurals>
+    <string name="pl_step_then_ride">then %1$s from %2$s at %3$s</string>
+    <string name="pl_step_then_walk">then walk %1$s</string>
+    <string name="pl_step_walk">Walk to %1$s</string>
+    <string name="pl_step_arrived">You\'re at %1$s</string>
+
+    <string name="pl_alert_leave_title">Leave now</string>
+    <string name="pl_alert_leave_text">%1$s → %2$s leaves %3$s at %4$s</string>
+    <string name="pl_alert_get_off_title">Get off at the next stop</string>
+    <string name="pl_alert_get_off_text">%1$s, at %2$s</string>
+    <string name="pl_alert_late_title">%1$s is now %2$d min late</string>
+    <string name="pl_alert_early_title">%1$s is now %2$d min early</string>
+    <string name="pl_alert_on_time_title">%1$s is on time now</string>
+    <string name="pl_alert_leaves_at">It leaves %1$s at %2$s</string>
+    <string name="pl_alert_replanned_title">That connection is gone: a new way</string>
+    <string name="pl_alert_new_way_title">The best way from here</string>
+    <string name="pl_alert_no_way_title">That connection is gone</string>
+    <string name="pl_alert_no_way_text">No other way there was found yet. It\'s tried again in a while.</string>
+</resources>

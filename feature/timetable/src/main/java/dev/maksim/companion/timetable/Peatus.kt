@@ -92,7 +92,7 @@ data class Trip(
     val liveFrom: Int = -1,
 )
 
-data class LatLon(val lat: Double, val lon: Double)
+data class LatLon(val lat: Double, val lon: Double) : java.io.Serializable
 
 data class TripStop(val stop: Stop, val scheduled: Int, val expected: Int, val isRealtime: Boolean) {
     fun time(serviceDay: Long): Long = (serviceDay + expected) * 1000
@@ -555,20 +555,9 @@ class PeatusClient {
      */
     private fun nightShift(route: JSONObject) = if (isNight(route.optString("gtfsId"))) NIGHT_SHIFT_S else 0
 
-    /**
-     * The route's mode, except that buses are split further. The feed marks every trolleybus and every bus as BUS;
-     * trolleybuses are told apart by their id (Tallinn's "tallinna-lin_trol_72"), regional buses by peatus.ee's
-     * route color, which is red for city buses and something else for county and long-distance lines.
-     */
-    private fun modeOf(route: JSONObject): String {
-        val mode = route.optString("mode")
-        if (mode != "BUS") return mode
-        return when {
-            "_trol_" in route.optString("gtfsId") -> TROLLEYBUS
-            route.optNullableString("color")?.lowercase(Locale.ROOT)?.let { it !in CITY_BUS_COLORS } == true -> REGIONAL
-            else -> mode
-        }
-    }
+    /** The route's mode: see the companion's [modeOf]. */
+    private fun modeOf(route: JSONObject): String =
+        modeOf(route.optString("gtfsId"), route.optString("mode"), route.optNullableString("color"))
 
     /**
      * The feed lets you "board" at a trip's last stop, so the end of every line would show up as a departure
@@ -617,6 +606,21 @@ class PeatusClient {
         /** Our own modes, alongside OpenTripPlanner's: see [modeOf]. */
         const val TROLLEYBUS = "TROLLEYBUS"
         const val REGIONAL = "REGIONAL"
+
+        /**
+         * A route's mode as this app tells them apart, from OpenTripPlanner's [mode], the route's [gtfsId] and its
+         * [color] on peatus.ee: buses are split further. The feed marks every trolleybus and every bus as BUS;
+         * trolleybuses are told apart by their id (Tallinn's "tallinna-lin_trol_72"), regional buses by peatus.ee's
+         * route color, which is red for city buses and something else for county and long-distance lines.
+         */
+        fun modeOf(gtfsId: String, mode: String, color: String?): String {
+            if (mode != "BUS") return mode
+            return when {
+                "_trol_" in gtfsId -> TROLLEYBUS
+                color?.lowercase(Locale.ROOT)?.let { it !in CITY_BUS_COLORS } == true -> REGIONAL
+                else -> mode
+            }
+        }
 
         /** Whether [live] may have live times for [trip] that peatus.ee doesn't. */
         fun mayGoLive(trip: Trip) = trip.mode == REGIONAL || TallinnLive.covers(trip.routeId)
@@ -700,7 +704,7 @@ object RouteOrder : Comparator<String> {
 }
 
 /** Google's encoded polyline format, which OpenTripPlanner uses for geometry. */
-internal object Polyline {
+object Polyline {
     fun decode(encoded: String): List<LatLon> {
         val points = ArrayList<LatLon>()
         var index = 0
@@ -729,7 +733,7 @@ internal object Polyline {
  * Asks an OpenTripPlanner's GraphQL endpoint ([url]): peatus.ee's, or Ridango's ([RidangoLive]). [source] names it
  * in errors.
  */
-internal fun graphQL(url: String, source: String, query: String, variables: JSONObject): JSONObject {
+fun graphQL(url: String, source: String, query: String, variables: JSONObject): JSONObject {
     val body = JSONObject().put("query", query.trimIndent()).put("variables", variables).toString()
     val connection = URL(url).openConnection() as HttpURLConnection
     try {
@@ -758,7 +762,7 @@ internal fun graphQL(url: String, source: String, query: String, variables: JSON
     }
 }
 
-internal fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
 
-internal fun JSONObject.optNullableString(name: String): String? =
+fun JSONObject.optNullableString(name: String): String? =
     if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }

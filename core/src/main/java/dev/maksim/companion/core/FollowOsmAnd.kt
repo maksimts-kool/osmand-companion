@@ -46,7 +46,9 @@ object FollowOsmAnd {
     }
 
     /** Whether [CompanionService] should be running now. */
-    fun wantsService(context: Context): Boolean =
-        context.companion.features.any { it.isEnabled } &&
-            (isOsmAndActive || !stopWithOsmAnd(context) || !isWatcherOn(context))
+    fun wantsService(context: Context): Boolean {
+        val enabled = context.companion.features.filter { it.isEnabled }
+        return enabled.any { it.runsWithoutOsmAnd } ||
+            (enabled.isNotEmpty() && (isOsmAndActive || !stopWithOsmAnd(context) || !isWatcherOn(context)))
+    }
 }

@@ -33,6 +33,14 @@
                     android:host="timetable"
                     android:scheme="osmandcompanion" />
             </intent-filter>
+            <!-- The trip planner: OsmAnd's "Plan a trip" item and a stop's "Trip to here" (OsmAndStopUi.PLANNER_LINK). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="planner"
+                    android:scheme="osmandcompanion" />
+            </intent-filter>
         </activity>
 
         <!-- Result of an update's install session. -->

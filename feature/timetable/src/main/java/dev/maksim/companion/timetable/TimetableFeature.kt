@@ -193,6 +193,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             val now = System.currentTimeMillis()
             val name = when (button) {
                 OsmAndStopUi.BUTTON_SHOW_IN_APP -> "showInApp"
+                OsmAndStopUi.BUTTON_TRIP_TO -> "tripTo"
                 else -> "nextDepartures"
             }
             Analytics.signal("Timetables.button", mapOf("button" to name))
@@ -200,6 +201,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId, pressedAt)
                     OsmAndStopUi.BUTTON_DEPARTURES -> showSheet(stopId, now, pressedAt)
+                    OsmAndStopUi.BUTTON_TRIP_TO -> showPlanner(stopId)
                 }
             } catch (e: IOException) {
                 val stop = nearbyStops.find { it.id == stopId } ?: return@post
@@ -213,6 +215,14 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     private fun showInApp(stopId: String, pressedAt: Long) {
         val name = nearbyStops.find { it.id == stopId }?.name
         open(StopActivity.intent(context, stopId, name, pressedAt, fromOsmand = true), name, OpenedScreens.Screen.STOP, stopId)
+    }
+
+    /** Opens the trip planner here with the stop as where to go. */
+    private fun showPlanner(stopId: String) {
+        val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
+        val intent = OsmAndStopUi.plannerLink(context, stop.name, stop.lat, stop.lon, stop.id)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        open(intent, stop.name, OpenedScreens.Screen.PLANNER, stopId)
     }
 
     /**

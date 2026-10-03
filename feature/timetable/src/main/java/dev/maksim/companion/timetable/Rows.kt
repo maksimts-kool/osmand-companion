@@ -22,7 +22,7 @@ import dev.maksim.companion.timetable.databinding.TtItemRowBinding
 import dev.maksim.companion.timetable.databinding.TtItemSectionBinding
 
 /** Small builders for the timetable screens, which are short lists laid out top to bottom. */
-internal object Rows {
+object Rows {
 
     fun section(parent: ViewGroup, text: CharSequence) {
         TtItemSectionBinding.inflate(LayoutInflater.from(parent.context), parent, true).root.text = text

@@ -29,3 +29,4 @@ rootProject.name = "osmand-companion"
 include(":app")
 include(":core")
 include(":feature:timetable")
+include(":feature:planner")

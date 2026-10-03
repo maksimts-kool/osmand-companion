@@ -170,6 +170,24 @@ class TallinnLive {
                 .minByOrNull { abs(it.scheduled - scheduled - ROUNDING_S) }
 
         /**
+         * The feed's departure of [route] ([mode]) towards [headsign] that's due first by the timetable, or null if it
+         * lists none. The feed drops a departure once its vehicle has left, so one due before that has gone.
+         */
+        fun firstListed(route: String, mode: String, headsign: String): Time? =
+            times.filter { it.mode == mode && it.route.equals(route, ignoreCase = true) }
+                .filter { sameWay(it.destination, headsign) }
+                .minByOrNull { it.scheduled }
+
+        /**
+         * The feed's first departure of [route] ([mode]) towards [headsign] expected at or after [after] (epoch
+         * seconds), or null: the next one of the line, for when the one planned on can't be caught.
+         */
+        fun next(route: String, mode: String, headsign: String, after: Long): Time? =
+            times.filter { it.mode == mode && it.route.equals(route, ignoreCase = true) && it.expected >= after }
+                .filter { sameWay(it.destination, headsign) }
+                .minByOrNull { it.expected }
+
+        /**
          * The feed's destinations are peatus.ee's headsigns, give or take a "(train station)" or the start of a
          * longer name ("Reisisadam" for "Reisisadam A-terminal"). Without either, there's nothing to go by.
          */

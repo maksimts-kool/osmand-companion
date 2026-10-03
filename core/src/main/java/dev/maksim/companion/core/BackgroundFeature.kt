@@ -17,6 +17,12 @@ interface BackgroundFeature {
     /** Whether the user has this feature on. Survives reboots: [BootReceiver] restarts the service. */
     val isEnabled: Boolean
 
+    /**
+     * Whether it keeps the service running while OsmAnd is closed, even with "Stop when OsmAnd closes" ([FollowOsmAnd]):
+     * for something under way, like a trip being taken.
+     */
+    val runsWithoutOsmAnd: Boolean get() = false
+
     /** Called on the main thread when the service starts running this feature. */
     fun start()
 

@@ -26,7 +26,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Stays connected to OsmAnd to report saved trip recordings and to keep transit timetables on its map up to date" />
+                android:value="Stays connected to OsmAnd to report saved trip recordings, to keep transit timetables on its map up to date, and to follow a public transport trip being taken on live times (next step, delays, missed connections)" />
         </service>
 
         <!-- Start and stop with OsmAnd: see FollowOsmAnd. Off until the user turns it on in Android's settings. -->

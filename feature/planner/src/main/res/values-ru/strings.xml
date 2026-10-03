@@ -1,0 +1,127 @@
+<resources>
+    <string name="pl_intro">Прокладывает маршрут по живому времени: опаздывающий автобус, на который ещё можно успеть, учитывается, а уже упущенная пересадка — нет. Живое время есть у автобусов, троллейбусов и трамваев Таллинна и уездных автобусов Харьюмаа.</string>
+    <string name="pl_from">Откуда</string>
+    <string name="pl_to">Куда</string>
+    <string name="pl_choose_from">Откуда?</string>
+    <string name="pl_choose_to">Куда?</string>
+    <string name="pl_swap">Поменять местами</string>
+    <string name="pl_my_location">Моё местоположение</string>
+    <string name="pl_my_location_detail">Где вы по данным OsmAnd</string>
+    <string name="pl_osmand_destination">Пункт назначения OsmAnd</string>
+    <string name="pl_osmand_destination_detail">Куда ведёт навигация OsmAnd</string>
+    <string name="pl_map_center">Центр карты OsmAnd</string>
+    <string name="pl_map_center_detail">Где сейчас карта OsmAnd</string>
+    <string name="pl_no_location">OsmAnd пока не знает, где вы. Откройте OsmAnd или выберите место.</string>
+
+    <string name="pl_leave_now">Выехать сейчас</string>
+    <string name="pl_depart_at">Выезд в %1$s</string>
+    <string name="pl_arrive_by">Прибыть к %1$s</string>
+    <string name="pl_depart_pick">Выезд в…</string>
+    <string name="pl_arrive_pick">Прибыть к…</string>
+
+    <string name="pl_searching">Ищем маршруты по живому времени…</string>
+    <string name="pl_needs_places">Выберите, куда ехать, и маршруты появятся здесь.</string>
+    <string name="pl_nothing">На общественном транспорте туда в это время не добраться.</string>
+    <string name="pl_failed">Не удалось проложить маршрут: %1$s</string>
+    <string name="pl_updated">Обновлено %1$s</string>
+    <string name="pl_updated_partly">Обновлено %1$s · %2$s не ответил</string>
+    <string name="pl_source_tallinn">transport.tallinn.ee</string>
+    <string name="pl_source_ridango">Ridango</string>
+    <string name="pl_source_peatus">peatus.ee</string>
+
+    <string name="pl_leave_in">Выходить через %1$s</string>
+    <string name="pl_leave_now_short">Выходить сейчас</string>
+    <string name="pl_leave_at">Выходить в %1$s</string>
+    <string name="pl_get_off">Выйти на «%1$s»</string>
+    <string name="pl_arrive">прибытие %1$s</string>
+    <string name="pl_direct">без пересадок</string>
+    <plurals name="pl_changes">
+        <item quantity="one">%1$d пересадка</item>
+        <item quantity="few">%1$d пересадки</item>
+        <item quantity="many">%1$d пересадок</item>
+        <item quantity="other">%1$d пересадки</item>
+    </plurals>
+    <string name="pl_walk_m">%1$d м пешком</string>
+    <string name="pl_walk_only">Всю дорогу пешком</string>
+    <string name="pl_ride_from">%1$s %2$s от «%3$s» в %4$s</string>
+    <string name="pl_change_tight">Всего %1$s на пересадку на «%2$s»</string>
+    <string name="pl_change_missed">Пересадка на «%1$s» упущена</string>
+    <string name="pl_replaced">На запланированный %1$s уже не успеть: вместо него следующий</string>
+    <string name="pl_gone">%1$s уже ушёл с «%2$s»</string>
+    <string name="pl_late_start">Выходите сейчас: %1$s придёт, когда вы дойдёте</string>
+
+    <string name="pl_title">→ %1$s</string>
+    <string name="pl_subtitle_from">от: %1$s</string>
+    <string name="pl_walk_to">Пешком %1$s до «%2$s»</string>
+    <string name="pl_walk">Пешком %1$s</string>
+    <string name="pl_walk_distance">%1$d м</string>
+    <string name="pl_change_margin">%1$s на пересадку</string>
+    <string name="pl_change_margin_missed">Не успеть на %1$s</string>
+    <plurals name="pl_stops_between">
+        <item quantity="one">%1$d остановка по пути</item>
+        <item quantity="few">%1$d остановки по пути</item>
+        <item quantity="many">%1$d остановок по пути</item>
+        <item quantity="other">%1$d остановки по пути</item>
+    </plurals>
+    <string name="pl_show_stops">Показать остановки по пути</string>
+    <string name="pl_hide_stops">Скрыть их</string>
+    <string name="pl_show_in_osmand">Показать в OsmAnd</string>
+    <string name="pl_walk_in_osmand">Идти туда с OsmAnd</string>
+    <string name="pl_trip_layer">Поездка (OsmAnd Companion)</string>
+    <string name="pl_trip_card">%1$s – %2$s · %3$s</string>
+    <string name="pl_trip_unknown">На peatus.ee нет этого рейса, поэтому его остановки не показать.</string>
+    <string name="pl_replan">Найти новый маршрут</string>
+
+    <string name="pl_search_hint">Адрес, место или остановка</string>
+    <string name="pl_recent">Недавние</string>
+    <string name="pl_from_osmand">Из OsmAnd</string>
+    <string name="pl_places">Места</string>
+    <string name="pl_search_empty">По запросу «%1$s» ничего не найдено.</string>
+    <string name="pl_search_failed">Не удалось выполнить поиск на peatus.ee: %1$s</string>
+
+    <string name="pl_trip_start">Начать поездку</string>
+    <string name="pl_trip_stop">Остановить</string>
+    <string name="pl_trip_started">Поездка начата: она в уведомлении. Для виджета в OsmAnd добавьте «Поездка (live)» в OsmAnd → Настройка экрана.</string>
+    <string name="pl_trip_feature">Поездка</string>
+    <string name="pl_trip_title">Поездка: %1$s</string>
+    <string name="pl_trip_banner">В пути: %1$s</string>
+    <string name="pl_trip_open">Открыть</string>
+    <string name="pl_trip_new_way">Новый маршрут</string>
+    <string name="pl_trip_channel">Текущая поездка</string>
+    <string name="pl_trip_alerts_channel">Оповещения о поездке</string>
+    <string name="pl_widget_title">Поездка (live)</string>
+    <string name="pl_widget_leave">Выход · %1$s</string>
+    <string name="pl_widget_ride">%1$s · %2$s</string>
+    <string name="pl_widget_off">Выход из ТС · %1$s</string>
+    <string name="pl_widget_walk">Пешком · %1$s</string>
+
+    <string name="pl_step_catch">%1$s в %2$s</string>
+    <string name="pl_step_walk_to_catch">Пешком %1$s до «%2$s» на %3$s</string>
+    <string name="pl_step_catch_at">%1$s от «%2$s»</string>
+    <string name="pl_step_wait">%1$s → %2$s в %3$s</string>
+    <string name="pl_step_wait_text">От «%1$s», через %2$s</string>
+    <string name="pl_step_ride">Выйти на «%1$s» в %2$s</string>
+    <plurals name="pl_stops_left">
+        <item quantity="one">Ещё %1$d остановка</item>
+        <item quantity="few">Ещё %1$d остановки</item>
+        <item quantity="many">Ещё %1$d остановок</item>
+        <item quantity="other">Ещё %1$d остановки</item>
+    </plurals>
+    <string name="pl_step_then_ride">затем %1$s от «%2$s» в %3$s</string>
+    <string name="pl_step_then_walk">затем пешком %1$s</string>
+    <string name="pl_step_walk">Пешком до «%1$s»</string>
+    <string name="pl_step_arrived">Вы на месте: %1$s</string>
+
+    <string name="pl_alert_leave_title">Пора выходить</string>
+    <string name="pl_alert_leave_text">%1$s → %2$s отправляется от «%3$s» в %4$s</string>
+    <string name="pl_alert_get_off_title">Выходите на следующей остановке</string>
+    <string name="pl_alert_get_off_text">«%1$s», в %2$s</string>
+    <string name="pl_alert_late_title">%1$s теперь опаздывает на %2$d мин</string>
+    <string name="pl_alert_early_title">%1$s теперь идёт на %2$d мин раньше</string>
+    <string name="pl_alert_on_time_title">%1$s теперь идёт по расписанию</string>
+    <string name="pl_alert_leaves_at">Отправление от «%1$s» в %2$s</string>
+    <string name="pl_alert_replanned_title">На пересадку уже не успеть: новый маршрут</string>
+    <string name="pl_alert_new_way_title">Лучший маршрут отсюда</string>
+    <string name="pl_alert_no_way_title">На пересадку уже не успеть</string>
+    <string name="pl_alert_no_way_text">Другого маршрута пока не найдено. Попробуем ещё раз чуть позже.</string>
+</resources>

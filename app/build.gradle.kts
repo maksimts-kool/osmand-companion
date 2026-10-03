@@ -88,6 +88,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":feature:timetable"))
+    implementation(project(":feature:planner"))
     // The daily update check.
     implementation("androidx.work:work-runtime:2.12.0")
     // The update popup's animation; the same version as the timetable feature's.
