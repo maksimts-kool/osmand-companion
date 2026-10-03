@@ -75,9 +75,7 @@
     <string name="pl_search_empty">Nothing found for “%1$s”.</string>
     <string name="pl_search_failed">Couldn\'t search peatus.ee: %1$s</string>
 
-    <string name="pl_trip_start">Start trip</string>
     <string name="pl_trip_stop">Stop trip</string>
-    <string name="pl_trip_started">Trip started: it\'s in the notification. For OsmAnd\'s widget, add Trip (live) in OsmAnd → Configure screen.</string>
     <string name="pl_trip_feature">Trip</string>
     <string name="pl_trip_title">Trip to %1$s</string>
     <string name="pl_trip_banner">On your way to %1$s</string>
@@ -118,4 +116,35 @@
     <string name="pl_alert_new_way_title">The best way from here</string>
     <string name="pl_alert_no_way_title">That connection is gone</string>
     <string name="pl_alert_no_way_text">No other way there was found yet. It\'s tried again in a while.</string>
+
+    <!-- Citymapper-style results, step cards and the live trip screen. -->
+    <string name="pl_suggested">Suggested</string>
+    <string name="pl_walk_tile">Walk</string>
+    <string name="pl_way_in">in %1$s min from %2$s</string>
+    <string name="pl_way_at">at %1$s from %2$s</string>
+    <string name="pl_unit_min">min</string>
+    <string name="pl_in">in</string>
+    <string name="pl_leave_within">Leave within %1$s</string>
+    <string name="pl_arrive_at">Arrive %1$s</string>
+    <string name="pl_walk_to_destination">Walk to destination</string>
+    <string name="pl_cant_make">Can\'t make it in time</string>
+    <string name="pl_go">GO</string>
+    <string name="pl_go_open">Live trip</string>
+    <string name="pl_walk_to_stop">Walk to stop</string>
+    <plurals name="pl_ride_stops">
+        <item quantity="one">Ride %1$d stop to %2$s</item>
+        <item quantity="other">Ride %1$d stops to %2$s</item>
+    </plurals>
+    <string name="pl_get_off_alert">Get off alert</string>
+    <string name="pl_prev">Prev</string>
+    <string name="pl_next">Next</string>
+    <string name="pl_now">Now</string>
+    <string name="pl_then_catch">Then %1$s at %2$s</string>
+    <string name="pl_be_there_by">%1$s · be there by %2$s</string>
+    <string name="pl_done">Done</string>
+    <string name="pl_trip_arrive">Arrive %1$s · %2$s</string>
+    <string name="pl_by_timetable">by the timetable</string>
+    <string name="pl_leaving_from">from %1$s at %2$s</string>
+    <string name="pl_time_left">Time left and arrival</string>
+    <string name="pl_departures">Departures</string>
 </resources>

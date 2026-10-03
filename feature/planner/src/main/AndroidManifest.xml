@@ -7,13 +7,18 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateVisible" />
 
-        <!--
-            Opened from the trip's notification or OsmAnd's widget (with NEW_TASK), it's in a task of its own, so Back
-            goes back to where that was; opened from this app, it's in the app's task as usual.
-        -->
         <activity
             android:name=".ItineraryActivity"
+            android:exported="false" />
+
+        <!--
+            The trip being taken, live. Opened from the trip's notification or OsmAnd's widget (with NEW_TASK), it's in
+            a task of its own, so Back goes back to where that was; opened from this app, it's in the app's task as usual.
+        -->
+        <activity
+            android:name=".LiveTripActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:taskAffinity="${applicationId}.trip" />
 
         <!-- The trip notification's New way and Stop buttons. -->

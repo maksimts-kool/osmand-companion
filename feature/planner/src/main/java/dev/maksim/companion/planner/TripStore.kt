@@ -29,6 +29,10 @@ data class ActiveTrip(
     val replannedAt: Long = 0,
     /** Goes up each time the itinerary is swapped. */
     val version: Int = 0,
+    /** The other departures the same way ([Way.options], [itinerary] among them), to swap for before leaving. */
+    val options: List<Itinerary> = emptyList(),
+    /** Whether to be told to get off at the next stop. */
+    val getOffAlert: Boolean = true,
 ) : Serializable
 
 /**
@@ -62,9 +66,12 @@ object TripStore {
     fun addListener(listener: Runnable) = listeners.add(listener)
     fun removeListener(listener: Runnable) = listeners.remove(listener)
 
-    /** Follows [itinerary] from [origin] to [destination], in place of any trip before. Call from the foreground. */
-    fun start(context: Context, itinerary: Itinerary, origin: String, destination: Place) {
-        save(context, ActiveTrip(itinerary, origin, destination, System.currentTimeMillis()))
+    /**
+     * Follows [itinerary] from [origin] to [destination], in place of any trip before; [options] are the other
+     * departures the same way. Call from the foreground.
+     */
+    fun start(context: Context, itinerary: Itinerary, origin: String, destination: Place, options: List<Itinerary> = emptyList()) {
+        save(context, ActiveTrip(itinerary, origin, destination, System.currentTimeMillis(), options = options))
         Analytics.signal("Trip.started", mapOf("rides" to itinerary.rides.size.toString(), "live" to itinerary.isLive.toString()))
         AppLog.log("Trip: following the way to ${destination.name}")
         CompanionService.update(context)
@@ -87,6 +94,20 @@ object TripStore {
             // Android 12+ won't start the service from the background; only stopping it was needed here anyway.
             AppLog.log("Trip: couldn't update the service: ${e.message}")
         }
+    }
+
+    /** Takes [itinerary], one of the trip's [ActiveTrip.options], in place of the one followed. */
+    fun choose(context: Context, itinerary: Itinerary) {
+        val trip = current(context) ?: return
+        if (trip.itinerary.signature == itinerary.signature) return
+        AppLog.log("Trip: took another departure")
+        // Leave again, for this one.
+        save(context, trip.copy(itinerary = itinerary, version = trip.version + 1, alerted = trip.alerted - TripProgress.LEAVE))
+    }
+
+    fun setGetOffAlert(context: Context, on: Boolean) {
+        val trip = current(context) ?: return
+        save(context, trip.copy(getOffAlert = on))
     }
 
     /** Keeps [trip] as the one being taken. Any thread. */

@@ -8,7 +8,7 @@ package dev.maksim.companion.planner
  */
 object Ranking {
 
-    const val MAX = 8
+    const val MAX = 12
 
     fun rank(itineraries: List<Itinerary>, arriveBy: Long? = null, max: Int = MAX): List<Itinerary> {
         val unique = itineraries.groupBy { it.signature }.values.map { same ->

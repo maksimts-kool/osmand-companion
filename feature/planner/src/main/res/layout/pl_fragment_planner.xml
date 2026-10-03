@@ -80,7 +80,9 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Until there are ways to show. -->
         <TextView
+            android:id="@+id/intro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/pl_intro"

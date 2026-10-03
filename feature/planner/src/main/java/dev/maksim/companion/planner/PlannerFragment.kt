@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.os.BundleCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.timepicker.MaterialTimePicker
@@ -18,8 +19,10 @@ import com.google.android.material.timepicker.TimeFormat
 import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.core.companion
 import dev.maksim.companion.planner.databinding.PlFragmentPlannerBinding
+import dev.maksim.companion.planner.databinding.PlItemWayGroupBinding
 import dev.maksim.companion.timetable.Estonia
 import dev.maksim.companion.timetable.OsmAndStopUi
+import dev.maksim.companion.timetable.Rows
 import dev.maksim.companion.timetable.States
 import dev.maksim.companion.timetable.TransitFormat
 import java.io.IOException
@@ -73,7 +76,7 @@ class PlannerFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        planner = TripPlanner(requireContext())
+        planner = TripPlanner()
         savedInstanceState?.let { state ->
             from = BundleCompat.getSerializable(state, KEY_FROM, Place::class.java)
             to = BundleCompat.getSerializable(state, KEY_TO, Place::class.java)
@@ -104,8 +107,8 @@ class PlannerFragment : Fragment() {
         binding.departAt.setOnClickListener { pickTime(arrive = false) }
         binding.arriveBy.setOnClickListener { pickTime(arrive = true) }
         binding.refresh.setOnClickListener { plan() }
-        binding.tripOpen.setOnClickListener { startActivity(ItineraryActivity.activeIntent(requireContext())) }
-        binding.tripCard.setOnClickListener { startActivity(ItineraryActivity.activeIntent(requireContext())) }
+        binding.tripOpen.setOnClickListener { startActivity(LiveTripActivity.intent(requireContext())) }
+        binding.tripCard.setOnClickListener { startActivity(LiveTripActivity.intent(requireContext())) }
         binding.tripStop.setOnClickListener { TripStore.stop(requireContext(), arrived = false) }
         TripStore.addListener(tripChanged)
         showTrip()
@@ -305,6 +308,7 @@ class PlannerFragment : Fragment() {
         if (from == null || to == null) {
             request++
             shown = emptyList()
+            binding.intro.isVisible = true
             binding.progress.visibility = View.INVISIBLE
             binding.refresh.visibility = View.GONE
             binding.status.text = if (from == null && to != null) getString(R.string.pl_no_location) else null
@@ -343,6 +347,7 @@ class PlannerFragment : Fragment() {
                 return
             }
             shown = emptyList()
+            binding.intro.isVisible = true
             binding.status.text = null
             States.error(binding.results, getString(R.string.pl_failed, message)) { plan() }
             return
@@ -368,8 +373,10 @@ class PlannerFragment : Fragment() {
         }
     }
 
+    /** The ways, as Citymapper lists them: walking on its own, then the rest, each with its departures. */
     private fun render(now: Long) {
         val results = binding.results
+        binding.intro.isVisible = shown.isEmpty()
         if (shown.isEmpty()) {
             States.empty(results, getString(R.string.pl_nothing))
             return
@@ -377,9 +384,16 @@ class PlannerFragment : Fragment() {
         results.removeAllViews()
         val origin = from?.name.orEmpty()
         val destination = to?.name.orEmpty()
-        for (itinerary in shown) {
-            ItineraryViews.card(results, itinerary, now) {
-                startActivity(ItineraryActivity.intent(requireContext(), itinerary, origin, destination))
+        val planned = time != null
+        val (walks, rides) = Way.group(shown).partition { it.isWalk }
+        val inflater = layoutInflater
+        for (group in listOf(walks, rides).filter { it.isNotEmpty() }) {
+            if (group === rides) Rows.section(results, getString(R.string.pl_suggested))
+            val card = PlItemWayGroupBinding.inflate(inflater, results, true)
+            for (way in group) {
+                ItineraryViews.way(card.rows, way, now, planned) {
+                    startActivity(ItineraryActivity.intent(requireContext(), way, origin, destination))
+                }
             }
         }
     }

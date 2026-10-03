@@ -1,19 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One way there in the Trips tab: when to leave, when you're there, the rides, and what to look out for. -->
+<!-- At the top of a way's steps: when to leave and when you're there, and the way at a glance. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    style="?attr/materialCardViewOutlinedStyle"
+    style="?attr/materialCardViewElevatedStyle"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="10dp"
-    app:cardCornerRadius="20dp">
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerLowest"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="16dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -38,58 +40,35 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textStyle="bold"
-                tools:text="Leave in 4 min" />
+                android:textAppearance="?attr/textAppearanceTitleLarge"
+                tools:text="Leave within 8 min" />
 
             <TextView
-                android:id="@+id/times"
+                android:id="@+id/arrive"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:fontFeatureSettings="tnum"
                 android:textAppearance="?attr/textAppearanceTitleMedium"
-                tools:text="15:04 – 15:41" />
+                android:textStyle="bold"
+                tools:text="Arrive 19:15" />
         </LinearLayout>
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:chipSpacingHorizontal="2dp"
+            app:chipSpacingVertical="6dp" />
 
         <TextView
             android:id="@+id/summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="6dp"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?attr/colorOnSurfaceVariant"
-            tools:text="37 min · 1 change · 650 m on foot" />
-
-        <!-- Walks and rides one after the other; wraps. -->
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chain"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:chipSpacingHorizontal="2dp"
-            app:chipSpacingVertical="6dp" />
-
-        <TextView
-            android:id="@+id/detail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            tools:text="Bus 23 from Vabaduse väljak at 15:07" />
-
-        <TextView
-            android:id="@+id/warning"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:drawablePadding="6dp"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="@color/tt_late"
-            android:visibility="gone"
-            app:drawableStartCompat="@drawable/tt_ic_warning"
-            app:drawableTint="@color/tt_late"
-            tools:text="Only 1 min to change at Kaja"
-            tools:visibility="visible" />
+            tools:text="27 min · direct · 900 m on foot" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

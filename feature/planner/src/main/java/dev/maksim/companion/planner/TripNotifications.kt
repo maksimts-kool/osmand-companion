@@ -31,6 +31,7 @@ object TripNotifications {
     private const val ONGOING_ID = 3
     private const val ALERT_ID = 4
     private const val ALERT_TIMEOUT_MS = 10 * 60_000L
+    private const val PROGRESS_MAX = 100
 
     /** The next step: [title] and [text] for the notification and the Trips tab, [widget] and [where] for OsmAnd's. */
     class Texts(val title: String, val text: String, val widget: String, val where: String)
@@ -114,7 +115,7 @@ object TripNotifications {
             .setContentTitle(texts.title)
             .setContentText(texts.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(texts.text))
-            .setSubText(context.getString(R.string.pl_trip_title, trip.destination.name))
+            .setSubText(context.getString(R.string.pl_trip_arrive, TransitFormat.clock(trip.itinerary.end), trip.destination.name))
             .setColor(ride?.let { Mode.of(it.mode).color } ?: context.getColor(TtR.color.tt_osm_accent))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -125,6 +126,8 @@ object TripNotifications {
             .addAction(0, context.getString(R.string.pl_trip_stop), action(context, TripActionReceiver.ACTION_STOP))
         if (progress.kind != Kind.ARRIVED) {
             builder.setWhen(progress.until).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
+            // How far along the whole way it is.
+            builder.setProgress(PROGRESS_MAX, (TripSteps.fraction(trip.itinerary, now) * PROGRESS_MAX).toInt(), false)
         }
         notify(context, ONGOING_ID, builder)
     }
@@ -200,9 +203,9 @@ object TripNotifications {
         }
     }
 
-    /** The trip's screen, from the notification or OsmAnd's widget. */
+    /** The trip's live screen, from the notification or OsmAnd's widget. */
     fun open(context: Context): PendingIntent = PendingIntent.getActivity(
-        context, 0, ItineraryActivity.activeIntent(context), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        context, 0, LiveTripActivity.intent(context), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
     private fun action(context: Context, action: String): PendingIntent = PendingIntent.getBroadcast(

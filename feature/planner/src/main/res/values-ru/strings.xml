@@ -79,9 +79,7 @@
     <string name="pl_search_empty">По запросу «%1$s» ничего не найдено.</string>
     <string name="pl_search_failed">Не удалось выполнить поиск на peatus.ee: %1$s</string>
 
-    <string name="pl_trip_start">Начать поездку</string>
     <string name="pl_trip_stop">Остановить</string>
-    <string name="pl_trip_started">Поездка начата: она в уведомлении. Для виджета в OsmAnd добавьте «Поездка (live)» в OsmAnd → Настройка экрана.</string>
     <string name="pl_trip_feature">Поездка</string>
     <string name="pl_trip_title">Поездка: %1$s</string>
     <string name="pl_trip_banner">В пути: %1$s</string>
@@ -124,4 +122,36 @@
     <string name="pl_alert_new_way_title">Лучший маршрут отсюда</string>
     <string name="pl_alert_no_way_title">На пересадку уже не успеть</string>
     <string name="pl_alert_no_way_text">Другого маршрута пока не найдено. Попробуем ещё раз чуть позже.</string>
+
+    <string name="pl_suggested">Варианты</string>
+    <string name="pl_walk_tile">Пешком</string>
+    <string name="pl_way_in">через %1$s мин от %2$s</string>
+    <string name="pl_way_at">в %1$s от %2$s</string>
+    <string name="pl_unit_min">мин</string>
+    <string name="pl_in">через</string>
+    <string name="pl_leave_within">Выходите в течение %1$s</string>
+    <string name="pl_arrive_at">Прибытие %1$s</string>
+    <string name="pl_walk_to_destination">Пешком до места</string>
+    <string name="pl_cant_make">Не успеть</string>
+    <string name="pl_go">В ПУТЬ</string>
+    <string name="pl_go_open">Поездка</string>
+    <string name="pl_walk_to_stop">Пешком до остановки</string>
+    <plurals name="pl_ride_stops">
+        <item quantity="one">%1$d остановка до %2$s</item>
+        <item quantity="few">%1$d остановки до %2$s</item>
+        <item quantity="many">%1$d остановок до %2$s</item>
+        <item quantity="other">%1$d остановки до %2$s</item>
+    </plurals>
+    <string name="pl_get_off_alert">Напомнить выйти</string>
+    <string name="pl_prev">Назад</string>
+    <string name="pl_next">Далее</string>
+    <string name="pl_now">Сейчас</string>
+    <string name="pl_then_catch">Затем %1$s в %2$s</string>
+    <string name="pl_be_there_by">%1$s · будьте там к %2$s</string>
+    <string name="pl_done">Готово</string>
+    <string name="pl_trip_arrive">Прибытие %1$s · %2$s</string>
+    <string name="pl_by_timetable">по расписанию</string>
+    <string name="pl_leaving_from">от %1$s в %2$s</string>
+    <string name="pl_time_left">Осталось и время прибытия</string>
+    <string name="pl_departures">Отправления</string>
 </resources>

@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The time to change between two rides, under the first: a pill, orange when it's tight, red when it's missed. -->
+<!-- The time to change between two rides, on the track between their cards: a pill, orange when it's tight, red when
+     it's missed. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingVertical="4dp">
+    android:orientation="horizontal">
 
-    <Space
-        android:layout_width="112dp"
-        android:layout_height="wrap_content" />
+    <View
+        android:layout_width="4dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="28dp"
+        android:background="?attr/colorOutlineVariant" />
 
     <TextView
         android:id="@+id/margin"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginVertical="8dp"
         android:background="@drawable/tt_pill_bg"
         android:fontFeatureSettings="tnum"
         android:includeFontPadding="false"

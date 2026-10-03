@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One way there, step by step, live; buttons to walk to the first stop with OsmAnd and to take the trip (the
-     header's shows it in OsmAnd). -->
+<!-- One way there, as Citymapper shows it: when to leave and get there, then a card per step on a track, live; at the
+     bottom, walk to the first stop with OsmAnd, and GO (the header's button shows it in OsmAnd). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurfaceContainer"
     android:orientation="vertical">
 
     <include
@@ -32,17 +33,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="8dp"
+            android:paddingHorizontal="12dp"
+            android:paddingTop="4dp"
             android:paddingBottom="16dp" />
     </ScrollView>
-
-    <com.google.android.material.divider.MaterialDivider
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceContainerLowest"
         android:gravity="end|center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
@@ -61,9 +60,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/trip"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:layout_marginStart="8dp"
-            android:text="@string/pl_trip_start"
-            app:icon="@drawable/tt_ic_route" />
+            android:backgroundTint="@color/pl_go"
+            android:paddingHorizontal="24dp"
+            android:text="@string/pl_go"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            app:icon="@drawable/pl_ic_arrow_go"
+            app:iconGravity="end"
+            app:iconSize="28dp"
+            app:iconTint="@android:color/white" />
     </LinearLayout>
 </LinearLayout>

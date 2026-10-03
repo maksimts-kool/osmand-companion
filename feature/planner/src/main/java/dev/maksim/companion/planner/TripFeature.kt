@@ -28,7 +28,7 @@ import net.osmand.aidlapi.mapwidget.UpdateMapWidgetParams
  */
 class TripFeature(private val context: Context, private val osmand: OsmAndConnection) : BackgroundFeature {
 
-    private val planner by lazy { TripPlanner(context) }
+    private val planner by lazy { TripPlanner() }
 
     override val title: String
         get() = TripStore.current(context)?.let { context.getString(R.string.pl_trip_title, it.destination.name) }
@@ -92,10 +92,13 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
     private fun update() {
         val stored = TripStore.current(context) ?: return
         val now = System.currentTimeMillis()
-        val itinerary = runCatching { planner.refresh(stored.itinerary) }.getOrDefault(stored.itinerary)
-        // Stopped, or planned again from the notification, while the live times came in.
+        // The other departures too, while there's still a choice: the live screen lists them.
+        val options = stored.options.takeIf { stored.itinerary.rides.firstOrNull()?.let { now < it.departure } == true }.orEmpty()
+        val fresh = runCatching { planner.refresh(listOf(stored.itinerary) + options) }.getOrNull()
+        val itinerary = fresh?.first() ?: stored.itinerary
+        // Stopped, or planned again or another departure taken, while the live times came in.
         if (TripStore.current(context)?.version != stored.version) return
-        var trip = stored.copy(itinerary = itinerary)
+        var trip = stored.copy(itinerary = itinerary, options = fresh?.drop(1) ?: options)
         if (now > itinerary.end + DONE_AFTER_MS) return TripStore.stop(context, arrived = true)
         TripProgress.missed(itinerary, now)?.let { leg ->
             if (now - trip.replannedAt >= REPLAN_EVERY_MS) trip = replan(trip, leg, now)
@@ -133,7 +136,8 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
             (here ?: stop?.let { Place(it.name, it.lat, it.lon) } ?: return trip.copy(replannedAt = now)) to null
         }
         val found = runCatching { planner.plan(TripPlanner.Request(from, trip.destination, time, arriveBy = false)) }
-        val best = found.getOrNull()?.itineraries?.firstOrNull()
+        val way = found.getOrNull()?.itineraries?.let(Way::group)?.firstOrNull()
+        val best = way?.best
         Analytics.signal(
             "Trip.replanned",
             mapOf("reason" to if (missed == null) "asked" else if (legs[missed].ride?.gone == true) "gone" else "connection", "found" to (best != null).toString()),
@@ -153,6 +157,7 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
             itinerary = best,
             replannedAt = now,
             version = trip.version + 1,
+            options = way.options,
             // Leave again, for the new way.
             alerted = trip.alerted - TripProgress.LEAVE,
         )
@@ -169,7 +174,7 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
             ride == null || progress.kind == Kind.WALK_THERE -> ICON_WALK
             else -> Mode.of(ride.mode).osmandIcon
         }
-        val onClick = ItineraryActivity.activeIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val onClick = LiveTripActivity.intent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val widget = AMapWidget(
             WIDGET_ID, ICON_WALK, context.getString(R.string.pl_widget_title), icon, icon, texts.widget, texts.where,
             WIDGET_ORDER, onClick,

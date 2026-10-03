@@ -76,7 +76,7 @@ object TripProgress {
 
     /**
      * The alerts due for [trip] at [progress] at [now], and the trip noting them, so each is given once: leave when
-     * it's [LEAVE_SOON_MS] to leaving; get off [GET_OFF_MS] before getting there; and the next ride's delay each time
+     * it's [LEAVE_SOON_MS] to leaving; get off [GET_OFF_MS] before getting there, unless it's turned off; and the next ride's delay each time
      * it has changed by [DELAY_STEP_MIN] minutes from what was told last (the first seen is only noted).
      */
     fun alerts(trip: ActiveTrip, progress: Progress, now: Long): Pair<List<Alert>, ActiveTrip> {
@@ -92,7 +92,7 @@ object TripProgress {
             }
             Kind.RIDE -> {
                 val key = GET_OFF + rideKey(leg)
-                if (progress.until - now <= GET_OFF_MS && key !in alerted) {
+                if (trip.getOffAlert && progress.until - now <= GET_OFF_MS && key !in alerted) {
                     alerts += Alert.GetOff(progress.leg)
                     alerted = alerted + key
                 }

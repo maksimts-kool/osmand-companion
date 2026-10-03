@@ -7,37 +7,66 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.view.isVisible
 import com.google.android.material.color.MaterialColors
-import dev.maksim.companion.planner.databinding.PlItemItineraryBinding
+import dev.maksim.companion.planner.databinding.PlItemWayBinding
 import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.Rows
 import dev.maksim.companion.timetable.TransitFormat
 import kotlin.math.abs
 
-/** How itineraries read on screen: the Trips tab's cards, and the words for their steps. */
+/** How itineraries read on screen: the Trips tab's rows, and the words for their steps. */
 object ItineraryViews {
 
-    /** A card for [itinerary] at the end of [parent], at [now]; [onClick] opens it. */
-    fun card(parent: ViewGroup, itinerary: Itinerary, now: Long, onClick: () -> Unit) {
-        val context = parent.context
-        val card = PlItemItineraryBinding.inflate(LayoutInflater.from(context), parent, true)
+    /**
+     * A row for [way] at the end of [rows], at [now], as Citymapper lists them: the walks and lines ("27 / 33") with
+     * how long it takes, and when its departures leave ("in 4, 21, 39 min from Koidu"; for a time picked ahead,
+     * [planned], at what times). [onClick] opens it.
+     */
+    fun way(rows: ViewGroup, way: Way, now: Long, planned: Boolean, onClick: () -> Unit) {
+        val context = rows.context
+        val row = PlItemWayBinding.inflate(LayoutInflater.from(context), rows, true)
         val live = context.getColor(dev.maksim.companion.timetable.R.color.tt_live)
-        val firstRide = itinerary.rides.firstOrNull()
-        card.leave.text = leave(context, itinerary.start, now)
-        val leavesLive = firstRide?.from?.isLive == true
-        card.leave.setTextColor(if (leavesLive) live else MaterialColors.getColor(card.leave, com.google.android.material.R.attr.colorOnSurface))
-        Rows.liveMark(card.live, leavesLive, live)
-        card.times.text = "${TransitFormat.clock(itinerary.start)} – ${TransitFormat.clock(itinerary.end)}"
-        card.summary.text = summary(context, itinerary)
-        chain(card.chain, itinerary)
-        card.detail.text = firstRide?.let { ride(context, it) } ?: context.getString(R.string.pl_walk_only)
-        card.detail.setTextColor(
-            if (leavesLive) live else MaterialColors.getColor(card.detail, com.google.android.material.R.attr.colorOnSurfaceVariant),
-        )
-        val warning = warning(context, itinerary, now)
-        card.warning.isVisible = warning != null
-        card.warning.text = warning
-        card.root.setOnClickListener { onClick() }
+        val variant = MaterialColors.getColor(row.root, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val best = way.best
+        val minutes = minutes(best.end - best.start)
+        row.duration.text = if (minutes < 60) minutes.toString() else duration(context, best.end - best.start)
+        row.unit.isVisible = minutes < 60
+        row.arrive.text = "→ ${TransitFormat.clock(best.end)}"
+        row.root.contentDescription = listOf(summary(context, best), departures(context, way, now, planned)).joinToString(", ")
+        if (way.isWalk) {
+            chain(row.chain, best, null, walkLabel = context.getString(R.string.pl_walk_tile))
+            row.departures.text = context.getString(R.string.pl_walk_distance, roundMeters(best.walkMeters))
+            Rows.liveMark(row.live, false, live)
+            Rows.liveMark(row.departuresLive, false, live)
+        } else {
+            chain(row.chain, best, way.lines)
+            val leavesLive = way.options.first().rides.first().from.isLive
+            Rows.liveMark(row.live, best.isLive, live)
+            Rows.liveMark(row.departuresLive, leavesLive, live)
+            row.departures.text = departures(context, way, now, planned)
+            row.departures.setTextColor(if (leavesLive) live else variant)
+        }
+        val warning = warning(context, best, now)
+        row.warning.isVisible = warning != null
+        row.warning.text = warning
+        row.root.setOnClickListener { onClick() }
     }
+
+    /** "in 4, 21, 39 min from Koidu"; "at 18:52, 19:07 from Koidu" for a time picked ahead or when it's far off. */
+    fun departures(context: Context, way: Way, now: Long, planned: Boolean): String {
+        val first = way.options.first().rides.firstOrNull() ?: return context.getString(R.string.pl_walk_only)
+        val times = way.departures.take(MAX_DEPARTURES)
+        return if (!planned && times.last() - now < SOON_MS) {
+            context.getString(R.string.pl_way_in, times.joinToString(", ") { countdown(it - now).toString() }, first.from.name)
+        } else {
+            context.getString(R.string.pl_way_at, times.joinToString(", ") { TransitFormat.clock(it) }, first.from.name)
+        }
+    }
+
+    /** Whole minutes, to the nearest; none less than 0. */
+    fun minutes(ms: Long): Int = ((ms + 30_000) / 60_000).toInt().coerceAtLeast(0)
+
+    /** Whole minutes to go, as TransitFormat.relative counts them, so every countdown on screen agrees. */
+    fun countdown(ms: Long): Int = (ms / 60_000).toInt().coerceAtLeast(0)
 
     /** "Leave in 4 min", "Leave now", "Leave at 17:05". */
     fun leave(context: Context, start: Long, now: Long): String = when {
@@ -104,33 +133,39 @@ object ItineraryViews {
         return null
     }
 
-    /** Walks and rides one after the other: the walk's minutes, the vehicle's number in its color. */
-    private fun chain(group: ViewGroup, itinerary: Itinerary) {
+    /**
+     * Walks and rides one after the other into [group]: the walk's minutes, the vehicle's number in its color; with
+     * [lines], each ride's lines as one ("27 / 33"). A walk with [walkLabel] says that instead of its minutes.
+     */
+    fun chain(group: ViewGroup, itinerary: Itinerary, lines: List<List<String>>? = null, walkLabel: String? = null) {
         val inflater = LayoutInflater.from(group.context)
         group.removeAllViews()
         // Not the few steps to a stop across the street.
         val legs = itinerary.legs.filter { !it.isWalk || it.duration >= MIN_WALK_MS || it.distance >= MIN_WALK_M * 2 }
             .ifEmpty { itinerary.legs }
+        var ride = 0
         for ((i, leg) in legs.withIndex()) {
             if (i > 0) (inflater.inflate(R.layout.pl_item_chain_walk, group, false) as TextView).apply {
                 setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.pl_ic_chevron, 0, 0, 0)
                 group.addView(this)
             }
-            val ride = leg.ride
-            if (ride == null) {
+            val vehicle = leg.ride
+            if (vehicle == null) {
                 (inflater.inflate(R.layout.pl_item_chain_walk, group, false) as TextView).apply {
                     setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.pl_ic_walk, 0, 0, 0)
-                    text = maxOf(1L, (leg.duration + 30_000) / 60_000).toString()
+                    text = walkLabel ?: maxOf(1L, (leg.duration + 30_000) / 60_000).toString()
                     contentDescription = context.getString(R.string.pl_walk, walk(context, leg))
                     group.addView(this)
                 }
             } else {
-                val mode = Mode.of(ride.mode)
+                val mode = Mode.of(vehicle.mode)
+                val names = lines?.getOrNull(ride)?.takeIf { it.isNotEmpty() } ?: listOf(vehicle.route)
+                ride++
                 (inflater.inflate(R.layout.pl_item_chain_ride, group, false) as TextView).apply {
                     setCompoundDrawablesRelativeWithIntrinsicBounds(mode.icon, 0, 0, 0)
-                    text = ride.route
+                    text = names.joinToString(" / ")
                     backgroundTintList = ColorStateList.valueOf(mode.color)
-                    contentDescription = vehicle(context, ride)
+                    contentDescription = "${context.getString(mode.label)} ${names.joinToString(", ")}"
                     group.addView(this)
                 }
             }
@@ -159,4 +194,10 @@ object ItineraryViews {
     /** Walks shorter than this aren't worth mentioning in the summary, or (twice as far) in the chain. */
     private const val MIN_WALK_M = 50.0
     private const val MIN_WALK_MS = 60_000L
+
+    /** Departures listed for a way. */
+    private const val MAX_DEPARTURES = 3
+
+    /** Departures further off than this are given as clock times. */
+    private const val SOON_MS = 90 * 60_000L
 }

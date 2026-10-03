@@ -172,4 +172,4 @@ private fun Leg.timed(start: Long): Leg {
 }
 
 /** What tells two calls at the same stop apart from others: its code, else its name. */
-private val Call.key: String get() = code ?: name.lowercase()
+internal val Call.key: String get() = code ?: name.lowercase()
