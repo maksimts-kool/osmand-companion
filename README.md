@@ -97,6 +97,10 @@ reached from the stop menu, the widget or the main menu. OsmAnd starts those its
   destination, as at the end of a line the vehicle arriving and the one leaving back can be due the same minute.
   A bus running late has already dropped out of peatus.ee's next departures, so those of the last 20 minutes are
   asked for too. If the feed doesn't answer, the timetable is shown as before.
+  The feed forgets a stop as soon as the vehicle has left it, so `LiveMemory` keeps the live time each trip was last
+  given at each stop (for the app's lifetime, pruned after 6 hours): a stop behind the vehicle that was seen live, on
+  the trip's screen or on a stop's departures (the stop screen, the Next departures sheet), keeps that time, in green,
+  about when it left. Ridango has those stops itself.
 - **Live times of Harjumaa's county buses**: peatus.ee has none for those either, so `RidangoLive` gets them from
   Ridango's OpenTripPlanner, the journey planner behind [iil.pilet.ee](https://iil.pilet.ee)
   (`wmb-otp-peutk.eu-prod.ridango.cloud/otp/routers/1/index/graphql`). It runs on the same national feed and answers
@@ -240,6 +244,7 @@ core/                     OsmAndConnection, CompanionService (keeps the process 
                           OsmAndWatcher + FollowOsmAnd (start and stop with OsmAnd),
                           Analytics (opt-in crash reports and usage stats, in Sentry)
 feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown inside OsmAnd), PeatusClient, TallinnLive,
+                          RidangoLive, LiveMemory (live times seen at stops the vehicle has left),
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider,
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
                           States (Lottie loading/empty/error)

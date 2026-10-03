@@ -326,13 +326,17 @@ class PeatusClient {
      * feed doesn't give a time for, in that window, are live with the delay of the one before: those it wasn't asked
      * about, those past its hour or so of predictions, and the last stop, which it never lists (nothing departs
      * from there towards it). Further ahead, they get that delay on their timetable.
+     *
+     * The stops behind the vehicle, which the feed no longer lists, get the live time they were last seen at
+     * ([LiveMemory]), if they were: about when it left them.
      */
     fun live(trip: Trip): Trip {
         if (trip.mode == REGIONAL) return countyLive(trip)
         if (!TallinnLive.covers(trip.routeId)) return trip
         val now = System.currentTimeMillis() / 1000
         val near = trip.stops.indices.filter { trip.serviceDay + trip.stops[it].scheduled in now - LATE_S..now + TRIP_AHEAD_S }
-        if (near.isEmpty()) return trip
+        // Done, or not on its way yet: whatever it was seen live at is behind it.
+        if (near.isEmpty()) return LiveMemory.recallPassed(trip, now)
         val feed = HashMap<String, TallinnLive.Times>()
         val asked = HashSet<Int>()
         fun ask(stops: IntRange) {
@@ -348,22 +352,26 @@ class PeatusClient {
         val first = findVehicle(near.first()..near.last(), trip.stops.indexOfFirst { trip.serviceDay + it.scheduled >= now }, ::ask) {
             listed(it) != null
         }
-        // Still at its first stop, or not due to leave it yet.
-        if (first == null || first <= 0 || trip.serviceDay + trip.stops.first().scheduled > now) return trip
+        // Still at its first stop, or not due to leave it yet; or the feed lists it nowhere: done, or not answering.
+        if (first == null || first <= 0 || trip.serviceDay + trip.stops.first().scheduled > now) {
+            return LiveMemory.recallPassed(trip, now)
+        }
         // A vehicle exactly on time only shows in the stops' lists as a whole: ask further ahead until one does.
         while (!hasVehicle()) {
-            val next = (asked.max() + 1).takeIf { it <= near.last() } ?: return trip
+            val next = (asked.max() + 1).takeIf { it <= near.last() } ?: return LiveMemory.recallPassed(trip, now)
             ask(next..minOf(next + TRIP_BATCH - 1, near.last()))
         }
         var delay = 0
         val stops = trip.stops.mapIndexed { i, stop ->
             val time = listed(i)
             when {
-                i < first -> stop
+                // Behind it.
+                i < first -> LiveMemory.recall(trip, stop) ?: stop
                 time != null -> {
                     val scheduled = (time.scheduled - trip.serviceDay).toInt()
                     val expected = (time.expected - trip.serviceDay).toInt()
                     delay = expected - scheduled
+                    LiveMemory.remember(trip.serviceDay, trip.id, stop.stop.id, stop.scheduled, scheduled, expected)
                     // The city's timetable is to the second, so how late it is comes out right.
                     stop.copy(scheduled = scheduled, expected = expected, isRealtime = true)
                 }
@@ -500,11 +508,10 @@ class PeatusClient {
                 val started = departure.tripStart?.let { serviceDay + it + delay <= now / 1000 } ?: true
                 if (!started || !live.isLive(time, started = true)) return@map departure
                 // The city's timetable is to the second, so how late it is comes out right.
-                departure.copy(
-                    scheduled = (time.scheduled - departure.serviceDay).toInt(),
-                    expected = (time.expected - departure.serviceDay).toInt(),
-                    isRealtime = true,
-                )
+                val scheduled = (time.scheduled - serviceDay).toInt()
+                val expected = (time.expected - serviceDay).toInt()
+                LiveMemory.remember(serviceDay, departure.tripId, stop.id, departure.scheduled, scheduled, expected)
+                departure.copy(scheduled = scheduled, expected = expected, isRealtime = true)
             }
             .filter { it.time >= now - LIVE_GRACE_MS }
             .sortedBy { it.time }
