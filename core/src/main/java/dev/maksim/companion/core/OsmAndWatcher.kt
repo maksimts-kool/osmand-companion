@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * app is in front. It reads nothing else: only the package of each window that comes up (never the window's
  * contents), which isn't kept or logged.
  *
- * "Left" is careful not to stop anything under the user: this app's own screens over OsmAnd (Full day, a trip)
+ * "Left" is careful not to stop anything under the user: this app's own screens over OsmAnd (Next departures, a trip)
  * and keyboards count as OsmAnd, and before stopping it asks OsmAnd whether its map is on screen after all, as coming back from
  * the lock screen doesn't always say which app is in front.
  */
@@ -50,7 +50,7 @@ class OsmAndWatcher : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         when {
             pkg in OsmAndConnection.OSMAND_PACKAGES -> onOsmAndInFront()
-            // This app's own screens over OsmAnd (Full day, a trip) keep it going, but don't start it.
+            // This app's own screens over OsmAnd (Next departures, a trip) keep it going, but don't start it.
             pkg == packageName -> if (FollowOsmAnd.isOsmAndActive) onOsmAndInFront()
             // Something else is in front: OsmAnd may be over (a keyboard or a system dialog comes and goes).
             FollowOsmAnd.isOsmAndActive && pkg !in TRANSIENT_PACKAGES && !isKeyboard(pkg) -> {

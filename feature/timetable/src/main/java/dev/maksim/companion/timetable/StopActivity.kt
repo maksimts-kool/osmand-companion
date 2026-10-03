@@ -37,8 +37,8 @@ import java.util.concurrent.Executors
  * departures. Unfolded, it's the chosen day's times printed by hour like at the stop itself ([Fold]). Tapping a departure or a minute opens that
  * trip ([TripActivity]); tapping a route in the header jumps to it.
  *
- * OsmAnd opens this from the Next departure widget, so it's exported. Its stop menu's Show in Companion button
- * opens it too, from [TimetableFeature].
+ * OsmAnd opens this from the Next departure widget, so it's exported. Its stop menu's Full timetable button
+ * opens it too, from [TimetableFeature]. Either way it's in a task of its own, so Back goes back to OsmAnd.
  */
 class StopActivity : AppCompatActivity() {
 
@@ -447,12 +447,17 @@ class StopActivity : AppCompatActivity() {
         private const val PULSE = 1.03f
         private const val PULSE_MS = 120L
 
-        /** [pressedAt]: [OpenedScreens.now] at the tap that opens it, so its load is timed from there. */
-        fun intent(context: Context, stopId: String, stopName: String?, pressedAt: Long? = null): Intent =
+        /**
+         * [pressedAt]: [OpenedScreens.now] at the tap that opens it, so its load is timed from there. [fromOsmand]:
+         * opened by OsmAnd, so in a fresh task of its own, which Back leaves for OsmAnd rather than this app's home
+         * screen (in this app's task, under it).
+         */
+        fun intent(context: Context, stopId: String, stopName: String?, pressedAt: Long? = null, fromOsmand: Boolean = false): Intent =
             Intent().setClassName(context.packageName, StopActivity::class.java.name)
                 .putExtra(EXTRA_STOP_ID, stopId)
                 .putExtra(EXTRA_STOP_NAME, stopName)
                 .apply { if (pressedAt != null) putExtra(OpenedScreens.EXTRA_PRESSED_AT, pressedAt) }
+                .apply { if (fromOsmand) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK) }
 
         fun dayLabel(context: Context, daysFromToday: Int): String = when (daysFromToday) {
             0 -> context.getString(R.string.tt_today)

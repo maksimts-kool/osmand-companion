@@ -41,9 +41,8 @@ import java.util.Locale
  *
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
  *    has a switch for it). Tapping a stop shows its name, which way it goes, and when that was loaded;
- *  - three buttons in that menu: "Next departures" opens the live next departures, and "Full day" the rest of
- *    today by route, each in a sheet over the map ([DaySheetActivity]); "Show in Companion" opens the stop's full
- *    timetable in this app;
+ *  - two buttons in that menu: "Next departures" opens the live next departures in a sheet over the map
+ *    ([DaySheetActivity]); "Full timetable" opens the stop's full timetable in this app;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
  *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
@@ -99,6 +98,11 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         }
         val added = osmand.call("addMapLayer") { it.addMapLayer(AddMapLayerParams(layer(emptyList()))) } == true
         if (!added) return false
+        // An OsmAnd that has kept running since this app was updated still has the Full day button: OsmAnd forgets
+        // the row under its id, whatever the callback's.
+        osmand.call("removeContextMenuButtons") {
+            it.removeContextMenuButtons(RemoveContextMenuButtonsParams("${BUTTONS_ID}_$RETIRED_BUTTON_FULL_DAY", -1L))
+        }
         for (row in buttonRows()) {
             osmand.call("addContextMenuButtons") { it.addContextMenuButtons(row, callback) }
                 ?.let { buttonCallbackIds[row.id] = it }
@@ -168,7 +172,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
     /**
      * The menu's detail rows: only when the stop was loaded. Its departures are a tap away, in the Next departures
-     * and Full day sheets, where they have room.
+     * sheet and the full timetable, where they have room.
      */
     private fun details(now: Long): List<String> = listOf(strings.getString(R.string.tt_updated, TransitFormat.clock(now)))
 
@@ -188,8 +192,8 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     }
 
     /**
-     * Whether OsmAnd's map screen looks dark right now, at a place near [lat], [lon], so the Full day sheet can
-     * match it; null when OsmAnd goes by its light sensor or the phone, and then the sheet follows the phone.
+     * Whether OsmAnd's map screen looks dark right now, at a place near [lat], [lon], so the Next departures sheet
+     * can match it; null when OsmAnd goes by its light sensor or the phone, and then the sheet follows the phone.
      */
     fun isNight(lat: Double, lon: Double, now: Long): Boolean? = when (preference(PREF_DAY_NIGHT)) {
         "DAY" -> false
@@ -259,15 +263,14 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         )
         return listOf(
             row(BUTTON_DEPARTURES, R.string.tt_button_departures, "ic_action_update"),
-            row(BUTTON_FULL_DAY, R.string.tt_button_full_day, "ic_action_time"),
-            row(BUTTON_SHOW_IN_APP, R.string.tt_button_show_in_app, "ic_action_external_link"),
+            row(BUTTON_SHOW_IN_APP, R.string.tt_full_timetable, "ic_action_time"),
         )
     }
 
     private fun widget(text: String, stop: Stop?): AMapWidget {
         // OsmAnd starts this from its application context, hence NEW_TASK.
-        val onClick = (stop?.let { StopActivity.intent(context, it.id, it.name) } ?: deepLink(context))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val onClick = stop?.let { StopActivity.intent(context, it.id, it.name, fromOsmand = true) }
+            ?: deepLink(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val icon = Mode.BUS.osmandIcon
         return AMapWidget(
             WIDGET_ID, icon, strings.getString(R.string.tt_widget_title), icon, icon, text, "", WIDGET_ORDER, onClick,
@@ -276,8 +279,10 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
     companion object {
         const val BUTTON_DEPARTURES = 1
-        const val BUTTON_FULL_DAY = 2
         const val BUTTON_SHOW_IN_APP = 3
+
+        /** The Full day button's, before Full timetable took its place: see [register]. */
+        private const val RETIRED_BUTTON_FULL_DAY = 2
 
         /** Opens this app's stop search; OsmAnd's main menu item points here. */
         const val DEEP_LINK = "osmandcompanion://timetable"

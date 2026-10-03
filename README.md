@@ -25,13 +25,12 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | **Map** | The stops around the map center, while it's in Estonia: colored dots from zoom 13, vehicle icons from 15. |
 | **Tap a stop** | OsmAnd's own context menu: stop name, which way it goes ("Bus stop · to Pelguranna"), and when it was loaded (`Updated 20:08 · peatus.ee`). When a stop is served both ways, OsmAnd's *What's here* list tells the two sides apart by direction. |
 | **Stop menu → Next departures** | Opens the next departures like a departure board, up to 12 and none more than an hour away (big minutes to go, then route, destination, time, and live delay where available: those minutes turn green, with a animated live mark) in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap one for that trip. |
-| **Stop menu → Full day** | Opens the rest of today by route, soonest first, as rows of times, in the same kind of sheet. Tap a time for that trip. |
-| **Stop menu → Show in Companion** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*) |
+| **Stop menu → Full timetable** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*). Back goes back to OsmAnd. |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
 | **Main menu → Transit timetables** | Opens this app's stop search. |
 | **Configure map** | The *OsmAnd Companion* item shows or hides the stops. |
 
-*Next departures*, *Full day* and *Show in Companion* open this app's screens while OsmAnd is in front, which Android (10+) only
+*Next departures* and *Full timetable* open this app's screens while OsmAnd is in front, which Android (10+) only
 allows an app that may **display over other apps**; the *Timetables* tab asks for it. Without it, they post a
 notification to tap instead.
 
@@ -42,14 +41,16 @@ screen: how soon the next one leaves, then the times after it, live where availa
 live mark; Tallinn's city buses, trolleybuses and trams, and Harjumaa's county buses). The hours below show live times too, so a late bus is
 under the minute it actually leaves, in green; today's live times refresh every 30 s. Tapping
 it unfolds the times from the next departure's hour on, laid out by hour like the timetables at Estonian stops,
-then the whole day, then folds it again. Routes done for today go last. Until 6 in the morning, *Today* (and the
-*Full day* sheet) also has the night's last runs of the day before, timetabled past 24:00 (25:04), so at 00:40 the
+then the whole day, then folds it again. Routes done for today go last. Until 6 in the morning, *Today* also has
+the night's last runs of the day before, timetabled past 24:00 (25:04), so at 00:40 the
 next bus isn't the first one of the morning. Tap a departure or a minute to see
 that trip: every stop along the route with its time (the route's timetable), live in green where the vehicle
 gives its times, with *Live* once in its header and how late or early (`+2`, `−1`) as the end part of each stop's ETA chip,
 with the vehicle drawn where the live times put it, gliding along as time goes by, and over to where fresh
 live times put it. *Show in OsmAnd* moves OsmAnd's map
-to the stop.
+to the stop. Opened from OsmAnd (its stop menu, its widget, or the notification standing in for them), a stop's
+timetable is in a task of its own, like the sheet, so Back from it goes back to OsmAnd rather than to this app's home
+screen.
 
 ### Route on OsmAnd's map
 
@@ -74,7 +75,7 @@ own map layer, buttons in the menu of *its own* points, map widgets and main men
 its own stops (`addMapLayer`) whose tap opens OsmAnd's standard context menu. That's the spot where you already
 look at a stop. Buttons are added with `addContextMenuButtons`. The menu's detail rows are only plain text, so the
 departures are one button away in sheets of this app's over OsmAnd's map, and the full timetable is in the app,
-reached from the widget or the main menu. OsmAnd starts those itself; Android doesn't let a background app open a screen.
+reached from the stop menu, the widget or the main menu. OsmAnd starts those itself; Android doesn't let a background app open a screen.
 
 ### How it works
 
@@ -99,9 +100,12 @@ reached from the widget or the main menu. OsmAnd starts those itself; Android do
 - **Live times of Harjumaa's county buses**: peatus.ee has none for those either, so `RidangoLive` gets them from
   Ridango's OpenTripPlanner, the journey planner behind [iil.pilet.ee](https://iil.pilet.ee)
   (`wmb-otp-peutk.eu-prod.ridango.cloud/otp/routers/1/index/graphql`). It runs on the same national feed and answers
-  the same GraphQL, with live times from the buses that send them (SEBE's, for one). Its trips are peatus.ee's with
-  `1:` for `estonia:`; its stops are by the code on the sign for some (`1:21207-1`) and by peatus.ee's number for
-  others, so a stop is asked for both ways at once, and the one with the stop's code wins. It's asked about a stop's
+  the same GraphQL, with live times from the buses that send them (SEBE's and Hansabuss's). It has each of
+  peatus.ee's trips twice: `1:` for `estonia:` with only the timetable, and the copy the live times are on, with a
+  number in front (`1:74_ATL_…` for `estonia:ATL_…`), which is the one its stops list; so that number is left out to
+  match them, and a trip is asked for both ways at once. Its stops are by the code on the sign for some
+  (`1:21207-1`) and by peatus.ee's number for others, so a stop is asked for both ways at once, and the one with the
+  stop's code wins. It's asked about a stop's
   county bus departures (`REGIONAL`) when it has any, and about a trip's stops all at once when it's a county bus's.
 - **Following the map**: every 4 s `TimetableFeature` asks OsmAnd where its map is (`getAppInfo`). Only while the
   map is on screen and in Estonia, it loads the stops within 1.2 km. It loads again once the map moves 400 m,
@@ -170,7 +174,7 @@ All of it goes to [Sentry](https://sentry.io) (`sentry-android-core`, without ND
   peatus.ee (by query field, e.g. `POST api.peatus.ee stopsByRadius`), transport.tallinn.ee, Ridango and Overpass, timed
   by `Analytics.timed(...)`. Inside the screen loading at the time, else on their own. All in debug builds, 20% in
   releases. The screens OsmAnd opens are timed from the tap until they show what they're for, by
-  `Analytics.screenLoad(...)`: the Next departures and Full day sheets (`Next departures sheet`, `Full day sheet`)
+  `Analytics.screenLoad(...)`: the Next departures sheet (`Next departures sheet`)
   and a stop's timetable (`Stop timetable`, from wherever it's opened; from OsmAnd's widget, from when it starts).
   Sentry's own timing of them starts at whenever one of this app's screens last paused, which for a screen opened
   from OsmAnd means nothing.
@@ -183,7 +187,7 @@ metric can count unique users). Opting out deletes that id and anything not yet 
 | `App.opened` | Home screen opens (3 s later) | `osmand` (missing / disconnected / noAccess / ready), `osmandApp`, `timetables`, `displayOverApps`, `startWithOsmAnd` |
 | `Timetables.turnedOn` / `turnedOff` | The *Show timetables in OsmAnd* switch | |
 | `Timetables.activeOnMap` | Stops loaded onto OsmAnd's map, once a day | |
-| `Timetables.button` | A stop menu button in OsmAnd | `button` (nextDepartures / fullDay / showInApp) |
+| `Timetables.button` | A stop menu button in OsmAnd | `button` (nextDepartures / showInApp, the Full timetable button) |
 | `Timetables.openBlocked` | Android didn't let a screen open over OsmAnd | `screen`, `notified` |
 | `Timetables.stopOpened` | A stop tapped in this app's list | `from` (nearMap / search) |
 | `Peatus.failed` | Loading stops failed (once per streak of failures) | `error` |

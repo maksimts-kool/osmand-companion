@@ -6,7 +6,6 @@ import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
 import android.content.res.Configuration
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.LocaleList
 import android.view.View
@@ -25,18 +24,15 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.timetable.databinding.TtActivityDaySheetBinding
 import dev.maksim.companion.timetable.databinding.TtItemSheetDepartureBinding
-import dev.maksim.companion.timetable.databinding.TtItemSheetRouteBinding
-import dev.maksim.companion.timetable.databinding.TtItemSheetTimeBinding
 import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
- * The Next departures and Full day buttons in a stop's OsmAnd menu open this over OsmAnd's map: the stop's next
- * departures, live where there are live times ([PeatusClient.stopWithin]), soonest first ([showsNext]); or the
- * rest of today by route, the route leaving soonest first. It's in OsmAnd's colors, day or night look and language, so it reads as part of OsmAnd.
- * (OsmAnd's API can only put text rows in its own menu.) It runs in a task of its own, so closing it goes straight
- * back to OsmAnd rather than to this app. Tapping a departure or a time opens that trip, and Full timetable the
- * stop's timetable, in its place ([leaveFor]).
+ * The Next departures button in a stop's OsmAnd menu opens this over OsmAnd's map: the stop's next departures, live
+ * where there are live times ([PeatusClient.stopWithin]), soonest first. It's in OsmAnd's colors, day or night look
+ * and language, so it reads as part of OsmAnd. (OsmAnd's API can only put text rows in its own menu.) It runs in a
+ * task of its own, so closing it goes straight back to OsmAnd rather than to this app. Tapping a departure opens
+ * that trip, and Full timetable the stop's timetable, in its place ([leaveFor]).
  */
 class DaySheetActivity : AppCompatActivity() {
 
@@ -47,15 +43,6 @@ class DaySheetActivity : AppCompatActivity() {
 
     private lateinit var stopId: String
     private var stopName: String? = null
-
-    /** The next departures rather than the rest of today. */
-    private var showsNext = false
-
-    /**
-     * What a load brings: the stop, with its next departures when [showsNext], else with [routes] and the next
-     * hour's departures, for their [live] times.
-     */
-    private class Loaded(val stop: Stop, val routes: List<RouteDay>?, val live: List<Departure> = emptyList())
 
     /** Answers to a load that's been superseded by Refresh are dropped. */
     private var request = 0
@@ -90,11 +77,10 @@ class DaySheetActivity : AppCompatActivity() {
         setContentView(binding.root)
         stopId = intent.getStringExtra(EXTRA_STOP_ID) ?: return finish()
         stopName = intent.getStringExtra(EXTRA_STOP_NAME)
-        showsNext = intent.getBooleanExtra(EXTRA_NEXT, false)
         val pressedAt = intent.getLongExtra(OpenedScreens.EXTRA_PRESSED_AT, -1).takeIf { it >= 0 && savedInstanceState == null }
-        screenLoad = Analytics.screenLoad(this, if (showsNext) "Next departures sheet" else "Full day sheet", pressedAt)
+        screenLoad = Analytics.screenLoad(this, "Next departures sheet", pressedAt)
         header(stopName, Mode.of(intent.getStringExtra(EXTRA_MODE)))
-        binding.subtitle.setText(if (showsNext) R.string.tt_next_departures else R.string.tt_rest_of_today)
+        binding.subtitle.setText(R.string.tt_next_departures)
 
         val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
         WindowCompat.getInsetsController(window, binding.root).isAppearanceLightNavigationBars = !night
@@ -113,7 +99,7 @@ class DaySheetActivity : AppCompatActivity() {
             override fun onStateChanged(sheet: View, newState: Int) {
                 when (newState) {
                     BottomSheetBehavior.STATE_HIDDEN -> finish()
-                    // The routes may have come in while it slid up, and it stopped where the shorter sheet would.
+                    // The departures may have come in while it slid up, and it stopped where the shorter sheet would.
                     BottomSheetBehavior.STATE_EXPANDED -> sheet.requestLayout()
                 }
             }
@@ -159,7 +145,7 @@ class DaySheetActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        OpenedScreens.resumed(this, if (showsNext) OpenedScreens.Screen.NEXT_SHEET else OpenedScreens.Screen.DAY_SHEET, stopId)
+        OpenedScreens.resumed(this, OpenedScreens.Screen.NEXT_SHEET, stopId)
     }
 
     override fun onDestroy() {
@@ -197,42 +183,31 @@ class DaySheetActivity : AppCompatActivity() {
         if (!spin.isStarted) spin.start()
         background.execute {
             val result = runCatching {
-                if (showsNext) Loaded(peatus.stopWithin(stopId, NEXT_WITHIN_S, NEXT_DEPARTURES) ?: throw IOException(unknown), null)
-                else peatus.today(stopId)?.let { (stop, routes) ->
-                    val next = runCatching { peatus.stopWithin(stopId, NEXT_WITHIN_S)?.departures }.getOrNull()
-                    Loaded(stop, routes, next.orEmpty())
-                } ?: throw IOException(unknown)
+                peatus.stopWithin(stopId, NEXT_WITHIN_S, NEXT_DEPARTURES) ?: throw IOException(unknown)
             }
             runOnUiThread { if (id == request && !isDestroyed) show(result, System.currentTimeMillis()) }
         }
     }
 
-    private fun show(result: Result<Loaded>, now: Long) {
+    private fun show(result: Result<Stop>, now: Long) {
         screenLoad?.finish(result.isSuccess)
         screenLoad = null
         binding.progress.isVisible = false
         // Finishes the turn it's on rather than stopping at an angle.
         spin.repeatCount = 0
         binding.content.removeAllViews()
-        val loaded = result.getOrElse {
+        val stop = result.getOrElse {
             States.error(binding.content, getString(R.string.tt_load_failed, it.message)) { load() }
             return
         }
-        val stop = loaded.stop
         stopName = stop.name
         header(stop.name, Mode.of(stop.mode))
-        val clock = TransitFormat.clock(now)
-        if (loaded.routes == null) {
-            binding.subtitle.text = getString(R.string.tt_sheet_subtitle_next, clock)
-            showNext(stop.departures, now)
-        } else {
-            binding.subtitle.text = getString(R.string.tt_sheet_subtitle, clock)
-            showDay(loaded.routes, loaded.live, now)
-        }
+        binding.subtitle.text = getString(R.string.tt_sheet_subtitle_next, TransitFormat.clock(now))
+        showNext(stop.departures, now)
     }
 
     private fun showNext(departures: List<Departure>, now: Long) {
-        // Only the soonest few, and only in the next hour: further off, the Full day sheet says it better.
+        // Only the soonest few, and only in the next hour: further off, the full timetable says it better.
         val upcoming = departures.filter { it.time >= now - GRACE_MS && it.time < now + NEXT_WITHIN_S * 1000L }
         upcoming.forEach { addDeparture(it, now) }
         if (upcoming.isEmpty()) States.empty(binding.content, getString(R.string.tt_no_departures_hour))
@@ -274,58 +249,11 @@ class DaySheetActivity : AppCompatActivity() {
         }
     }
 
-    /** One of a route's times left today: when it leaves, live if [isRealtime]. */
-    private class Time(val tripId: String, val serviceDay: Long, val time: Long, val isRealtime: Boolean)
-
-    /** The times left, each at its live time if it's among the [live] next departures, as they leave. */
-    private fun showDay(routes: List<RouteDay>, live: List<Departure>, now: Long) {
-        val byTrip = live.filter { it.isRealtime }.associateBy { it.serviceDay to it.tripId }
-        val left = routes.map { route ->
-            route to route.times.map { time ->
-                val departure = byTrip[time.serviceDay to time.tripId]
-                Time(time.tripId, time.serviceDay, departure?.time ?: time.time, departure != null)
-            }.filter { it.time >= now - GRACE_MS }.sortedBy { it.time }
-        }.filter { it.second.isNotEmpty() }
-        left.sortedBy { (_, times) -> times.first().time }
-            .forEach { (route, times) -> addRoute(route, times, now) }
-        if (left.isEmpty()) States.empty(binding.content, getString(R.string.tt_no_more_today))
-    }
-
-    private fun addRoute(route: RouteDay, left: List<Time>, now: Long) {
-        val item = TtItemSheetRouteBinding.inflate(layoutInflater, binding.content, true)
-        Rows.badge(item.badge, route.route, route.mode)
-        item.headsign.text = getString(R.string.tt_towards, route.headsign)
-        val soon = TransitFormat.relative(this, left.first().time, now)
-        item.next.text = if (soon == getString(R.string.tt_now)) soon else getString(R.string.tt_next_in, soon)
-        item.next.isVisible = soon != null
-        if (left.first().isRealtime) item.next.setTextColor(getColor(R.color.tt_live))
-
-        // Green for the live ones, like the Next departures sheet.
-        left.forEachIndexed { i, time ->
-            TtItemSheetTimeBinding.inflate(layoutInflater, item.times, true).root.run {
-                val accent = getColor(if (time.isRealtime) R.color.tt_live else R.color.tt_osm_accent)
-                text = TransitFormat.clock(time.time)
-                if (time.isRealtime) contentDescription = "$text, ${getString(R.string.tt_live)}"
-                if (i == 0) {
-                    backgroundTintList = ColorStateList.valueOf(accent)
-                    setTextColor(getColor(R.color.tt_osm_on_accent))
-                    setTypeface(typeface, Typeface.BOLD)
-                } else if (time.isRealtime) {
-                    setTextColor(accent)
-                }
-                setOnClickListener {
-                    leaveFor(TripActivity.intent(this@DaySheetActivity, time.tripId, time.serviceDay, stopId))
-                }
-            }
-        }
-    }
-
     companion object {
         private const val EXTRA_STOP_ID = "stop_id"
         private const val EXTRA_STOP_NAME = "stop_name"
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_NIGHT = "night"
-        private const val EXTRA_NEXT = "next"
 
         /**
          * The Next departures sheet shows those leaving in the next [NEXT_WITHIN_S] seconds, at most
@@ -356,16 +284,15 @@ class DaySheetActivity : AppCompatActivity() {
         var locales: LocaleList? = null
 
         /**
-         * Opens the sheet for [stop], with its [next] departures or else the rest of today, in a fresh task of its
-         * own, over whatever is in front (OsmAnd). [night] is whether OsmAnd looks dark right now; null follows the
-         * phone. [pressedAt]: see [OpenedScreens.EXTRA_PRESSED_AT].
+         * Opens the sheet with [stop]'s next departures in a fresh task of its own, over whatever is in front
+         * (OsmAnd). [night] is whether OsmAnd looks dark right now; null follows the phone. [pressedAt]: see
+         * [OpenedScreens.EXTRA_PRESSED_AT].
          */
-        fun intent(context: Context, stop: Stop, next: Boolean, night: Boolean?, pressedAt: Long? = null): Intent =
+        fun intent(context: Context, stop: Stop, night: Boolean?, pressedAt: Long? = null): Intent =
             Intent().setClassName(context.packageName, DaySheetActivity::class.java.name)
                 .putExtra(EXTRA_STOP_ID, stop.id)
                 .putExtra(EXTRA_STOP_NAME, stop.name)
                 .putExtra(EXTRA_MODE, stop.mode)
-                .putExtra(EXTRA_NEXT, next)
                 .apply { if (night != null) putExtra(EXTRA_NIGHT, night) }
                 .apply { if (pressedAt != null) putExtra(OpenedScreens.EXTRA_PRESSED_AT, pressedAt) }
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

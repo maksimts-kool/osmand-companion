@@ -193,15 +193,13 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             val now = System.currentTimeMillis()
             val name = when (button) {
                 OsmAndStopUi.BUTTON_SHOW_IN_APP -> "showInApp"
-                OsmAndStopUi.BUTTON_FULL_DAY -> "fullDay"
                 else -> "nextDepartures"
             }
             Analytics.signal("Timetables.button", mapOf("button" to name))
             try {
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId, pressedAt)
-                    OsmAndStopUi.BUTTON_FULL_DAY -> showSheet(stopId, now, next = false, pressedAt)
-                    OsmAndStopUi.BUTTON_DEPARTURES -> showSheet(stopId, now, next = true, pressedAt)
+                    OsmAndStopUi.BUTTON_DEPARTURES -> showSheet(stopId, now, pressedAt)
                 }
             } catch (e: IOException) {
                 val stop = nearbyStops.find { it.id == stopId } ?: return@post
@@ -214,18 +212,18 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     /** Opens the stop's timetable here, its load timed from [pressedAt], the button press. */
     private fun showInApp(stopId: String, pressedAt: Long) {
         val name = nearbyStops.find { it.id == stopId }?.name
-        open(StopActivity.intent(context, stopId, name, pressedAt).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), name, OpenedScreens.Screen.STOP, stopId)
+        open(StopActivity.intent(context, stopId, name, pressedAt, fromOsmand = true), name, OpenedScreens.Screen.STOP, stopId)
     }
 
     /**
-     * Opens the stop's [next] departures, or else the rest of today, in a sheet over OsmAnd's map, dark when
-     * OsmAnd is. Its load is timed from [pressedAt], the button press.
+     * Opens the stop's next departures in a sheet over OsmAnd's map, dark when OsmAnd is. Its load is timed from
+     * [pressedAt], the button press.
      */
-    private fun showSheet(stopId: String, now: Long, next: Boolean, pressedAt: Long) {
+    private fun showSheet(stopId: String, now: Long, pressedAt: Long) {
         val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
         DaySheetActivity.locales = ui.locales
-        val screen = if (next) OpenedScreens.Screen.NEXT_SHEET else OpenedScreens.Screen.DAY_SHEET
-        open(DaySheetActivity.intent(context, stop, next, ui.isNight(stop.lat, stop.lon, now), pressedAt), stop.name, screen, stopId)
+        val intent = DaySheetActivity.intent(context, stop, ui.isNight(stop.lat, stop.lon, now), pressedAt)
+        open(intent, stop.name, OpenedScreens.Screen.NEXT_SHEET, stopId)
     }
 
     /**

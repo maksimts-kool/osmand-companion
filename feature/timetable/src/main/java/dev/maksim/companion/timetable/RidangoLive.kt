@@ -9,9 +9,11 @@ import org.json.JSONObject
  * the live times of the buses that send them to Ridango's ticket system. peatus.ee doesn't get those, so its
  * county bus times are only the timetable.
  *
- * It answers the same GraphQL as peatus.ee. Its trips are peatus.ee's with "1:" for "estonia:"; its stops are by
- * the code on the sign for some ("1:21207-1" is peatus.ee's "estonia:1634") and by peatus.ee's number for others
- * ("1:138215"), so a stop is asked for both ways at once.
+ * It answers the same GraphQL as peatus.ee. It has each of peatus.ee's trips twice: with "1:" for "estonia:", only
+ * the timetable, and the copy its live times are on, which also has a number in front ("1:74_ATL_…" for
+ * "estonia:ATL_…"), and is the one its stops list. Its stops are by the code on the sign for some ("1:21207-1" is
+ * peatus.ee's "estonia:1634") and by peatus.ee's number for others ("1:138215"), so a stop is asked for both ways at
+ * once.
  *
  * Blocking: call it off the main thread.
  */
@@ -47,20 +49,30 @@ class RidangoLive {
             }
     }
 
-    /** Every stop of trip [tripId] (peatus.ee's) on [date] (yyyyMMdd), or null if Ridango doesn't know it. */
+    /** "estonia:ATL_…" for Ridango's "1:74_ATL_…" (or "1:ATL_…"), noting the number in front for [trip]. */
+    private fun tripId(ridangoId: String): String {
+        val bare = ridangoId.substringAfter(':')
+        val prefix = LIVE_PREFIX.find(bare)?.value ?: return "estonia:$bare"
+        if (prefix !in prefixes) prefixes = prefixes + prefix
+        return "estonia:" + bare.removePrefix(prefix)
+    }
+
+    /**
+     * Every stop of trip [tripId] (peatus.ee's) on [date] (yyyyMMdd), or null if Ridango doesn't know it. Asks for
+     * each of the ids the trip may have there at once (with each of [prefixes] in front, and without), and takes the
+     * one with live times, if any.
+     */
     fun trip(tripId: String, date: String): List<StopTime>? {
-        val query = """
-            query(${'$'}id: String!, ${'$'}date: String!) {
-              trip(id: ${'$'}id) {
-                stoptimesForDate(serviceDate: ${'$'}date) {
-                  scheduledDeparture realtimeDeparture realtime stop { code }
-                }
-              }
-            }
-        """
-        val json = request(query, JSONObject().put("id", "$FEED:" + tripId.substringAfter(':')).put("date", date))
-            .optJSONObject("trip") ?: return null
-        return json.getJSONArray("stoptimesForDate").objects().map {
+        val bare = tripId.substringAfter(':')
+        val ids = (prefixes.map { "$FEED:$it$bare" } + "$FEED:$bare").distinct()
+        val trips = ids.withIndex().joinToString(" ") { (i, id) ->
+            "t$i: trip(id: \"$id\") { stoptimesForDate(serviceDate: \$date) { $TRIP_STOP } }"
+        }
+        val data = request("query(\$date: String!) { $trips }", JSONObject().put("date", date))
+        val found = ids.indices.mapNotNull { data.optJSONObject("t$it")?.getJSONArray("stoptimesForDate")?.objects() }
+        val json = found.firstOrNull { times -> times.any { it.optBoolean("realtime") } } ?: found.firstOrNull()
+            ?: return null
+        return json.map {
             StopTime(
                 it.getJSONObject("stop").optNullableString("code"),
                 it.getInt("scheduledDeparture"),
@@ -88,11 +100,21 @@ class RidangoLive {
             "stoptimesWithoutPatterns(startTime: \$start, timeRange: \$range, numberOfDepartures: \$n)" +
                 " { serviceDay realtimeDeparture realtime trip { gtfsId } }"
 
+        private const val TRIP_STOP = "scheduledDeparture realtimeDeparture realtime stop { code }"
+
+        /** The number in front of the trip ids live times are on: "74_" in "74_ATL_…". */
+        private val LIVE_PREFIX = Regex("""^\d+_""")
+
+        /**
+         * The numbers in front of trip ids its stops have listed so far, for [trip]: "74_" for Harjumaa's, the only
+         * one seen yet.
+         */
+        @Volatile
+        private var prefixes = setOf("74_")
+
         private const val MARGIN_S = 30 * 60
 
         /** Plenty for a busy stop's couple of hours of county buses. */
         private const val MAX_DEPARTURES = 200
-
-        private fun tripId(ridangoId: String) = "estonia:" + ridangoId.substringAfter(':')
     }
 }

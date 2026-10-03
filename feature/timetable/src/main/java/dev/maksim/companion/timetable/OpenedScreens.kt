@@ -8,13 +8,13 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Which of this app's screens came up for which stop, and when, so [TimetableFeature] can tell whether Android let it
  * open one over OsmAnd. It asks "has it come up since I asked", not "is it on screen now": a screen that opened and
- * was left again quickly (a time tapped in the Full day sheet, the screen turned off) did open.
+ * was left again quickly (a departure tapped in the Next departures sheet, the screen turned off) did open.
  *
  * A screen that comes up after the feature gave up on it (a slow start) takes back the notification sent instead.
  */
 internal object OpenedScreens {
 
-    enum class Screen { STOP, DAY_SHEET, NEXT_SHEET }
+    enum class Screen { STOP, NEXT_SHEET }
 
     /** The notification that opens a screen Android didn't let us open directly; one at a time. */
     const val NOTIFICATION_ID = 2

@@ -1,6 +1,6 @@
 <resources>
     <!--
-        OsmAnd's own colors (5.4, from its APK), so the Full day sheet looks like part of OsmAnd. The night ones
+        OsmAnd's own colors (5.4, from its APK), so the Next departures sheet looks like part of OsmAnd. The night ones
         are in values-night; the sheet picks day or night the way OsmAnd's map screen does. The accent is the
         app logo's blue, day and night.
     -->
@@ -12,7 +12,6 @@
     <color name="tt_osm_on_accent">#FFFFFF</color>
     <color name="tt_osm_divider">#E6E6E6</color>            <!-- divider_color_light -->
     <color name="tt_osm_button_outline">#CCCCCC</color>     <!-- stroked_buttons_and_links_outline_light -->
-    <color name="tt_osm_time_bg">#F2F2F2</color>            <!-- ctx_menu_buttons_bg_light -->
     <color name="tt_osm_scrim">#66000000</color>
 
     <!-- Departure times from the vehicle rather than the timetable, day and night: in the app and the sheet. -->

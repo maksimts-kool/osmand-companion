@@ -5,7 +5,6 @@
     <color name="tt_osm_icon">#727272</color>               <!-- icon_color_default_dark -->
     <color name="tt_osm_divider">#2C3033</color>            <!-- divider_color_dark -->
     <color name="tt_osm_button_outline">#303336</color>     <!-- stroked_buttons_and_links_outline_dark -->
-    <color name="tt_osm_time_bg">#222526</color>            <!-- ctx_menu_buttons_bg_dark -->
     <color name="tt_osm_scrim">#99000000</color>
 
     <!-- Departure times from the vehicle rather than the timetable, day and night: in the app and the sheet. -->
