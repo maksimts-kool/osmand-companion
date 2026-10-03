@@ -29,15 +29,20 @@ object TripSteps {
         return steps
     }
 
-    /** Which of [steps] (of [itinerary]) it's at, at [now], going by the times as they're expected now. */
-    fun current(itinerary: Itinerary, steps: List<Step>, now: Long): Int {
-        val progress = TripProgress.at(itinerary, now)
+    /**
+     * Which of [steps] (of [itinerary]) it's at, at [now], going by the times as they're expected now and the places
+     * [reached] on foot: at the stop, it's boarding, however early. [located]: OsmAnd knows where you are, so until
+     * the stop's reached it's walking there, however late; without, the clock says when the walk's done.
+     */
+    fun current(itinerary: Itinerary, steps: List<Step>, now: Long, reached: Map<String, Long> = emptyMap(), located: Boolean = false): Int {
+        val progress = TripProgress.at(itinerary, now, reached)
         val legs = itinerary.legs
         val step = when (progress.kind) {
             TripProgress.Kind.LEAVE -> return 0
             TripProgress.Kind.TO_STOP -> {
                 val before = legs.getOrNull(progress.leg - 1)
-                if (before != null && before.isWalk && now < before.arrival) Step(Kind.WALK, progress.leg - 1)
+                val atStop = TripProgress.stopKey(legs[progress.leg].from) in reached
+                if (before != null && before.isWalk && !atStop && (located || now < before.arrival)) Step(Kind.WALK, progress.leg - 1)
                 else Step(Kind.BOARD, progress.leg)
             }
             TripProgress.Kind.RIDE -> Step(Kind.RIDE, progress.leg)
@@ -47,10 +52,18 @@ object TripSteps {
         return steps.indexOf(step).coerceAtLeast(0)
     }
 
-    /** How far through the trip it is at [now], 0 to 1. */
-    fun fraction(itinerary: Itinerary, now: Long): Float {
+    /**
+     * How far through the trip it is at [now], 0 to 1. While walking leg [walking] (its index and how far along it
+     * is, from where OsmAnd has you), by that instead of the clock: walking early or late is as far as it's got.
+     */
+    fun fraction(itinerary: Itinerary, now: Long, walking: Pair<Int, Float>? = null): Float {
         val span = itinerary.end - itinerary.start
         if (span <= 0) return 1f
+        if (walking != null) {
+            val leg = itinerary.legs[walking.first]
+            val done = leg.departure - itinerary.start + walking.second * leg.duration
+            return (done.toFloat() / span).coerceIn(0f, 1f)
+        }
         return ((now - itinerary.start).toFloat() / span).coerceIn(0f, 1f)
     }
 }

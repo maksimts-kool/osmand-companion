@@ -54,4 +54,17 @@ class TripStepsTest {
         val steps = TripSteps.of(noWalk)
         assertEquals(TripSteps.Step(Kind.BOARD, 0), steps[TripSteps.current(noWalk, steps, t0 - 3 * minute)])
     }
+
+    @Test
+    fun walksToTheNextStopThenTheEnd() {
+        fun target(offset: Long) = OsmAndTrip.walkTarget(itinerary, TripProgress.at(itinerary, t0 + offset))?.name
+        // Not yet left, walking, and waiting: the first ride's stop.
+        assertEquals("A", target(-8 * minute))
+        assertEquals("A", target(-2 * minute))
+        // On a ride, nowhere.
+        assertEquals(null, target(minute))
+        assertEquals("B2", target(11 * minute))
+        assertEquals("Work", target(26 * minute))
+        assertEquals(null, target(30 * minute))
+    }
 }

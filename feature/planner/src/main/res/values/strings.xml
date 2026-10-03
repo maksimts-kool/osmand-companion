@@ -147,4 +147,13 @@
     <string name="pl_leaving_from">from %1$s at %2$s</string>
     <string name="pl_time_left">Time left and arrival</string>
     <string name="pl_departures">Departures</string>
+    <string name="pl_walking_osmand">Walking with OsmAnd</string>
+    <string name="pl_osmand_eta">OsmAnd: %1$s · there at %2$s</string>
+    <string name="pl_osmand_there_in">OsmAnd: there in %1$s</string>
+    <string name="pl_eta_ahead">You\'ll be there %1$s before %2$s leaves</string>
+    <string name="pl_eta_miss">At this pace you\'ll miss %1$s by %2$s</string>
+    <string name="pl_walking">Walking</string>
+    <string name="pl_to_go">%1$s to go</string>
+    <string name="pl_at_stop">At the stop</string>
+    <string name="pl_distance_km">%1$s km</string>
 </resources>

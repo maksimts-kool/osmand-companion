@@ -182,6 +182,11 @@ object ItineraryViews {
         }
     }
 
+    /** "450 m", or "1.7 km" from a kilometer on. */
+    fun distance(context: Context, meters: Double): String =
+        if (meters < 1000) context.getString(R.string.pl_walk_distance, roundMeters(meters))
+        else context.getString(R.string.pl_distance_km, String.format(java.util.Locale.getDefault(), "%.1f", meters / 1000))
+
     /** To the nearest 10 m: walking distances are a guess. */
     fun roundMeters(meters: Double): Int = ((meters + 5) / 10).toInt() * 10
 

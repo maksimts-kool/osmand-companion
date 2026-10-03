@@ -154,4 +154,13 @@
     <string name="pl_leaving_from">от %1$s в %2$s</string>
     <string name="pl_time_left">Осталось и время прибытия</string>
     <string name="pl_departures">Отправления</string>
+    <string name="pl_walking_osmand">Идёте с OsmAnd</string>
+    <string name="pl_osmand_eta">OsmAnd: %1$s · там в %2$s</string>
+    <string name="pl_osmand_there_in">OsmAnd: там через %1$s</string>
+    <string name="pl_eta_ahead">Будете там за %1$s до отправления: %2$s</string>
+    <string name="pl_eta_miss">В таком темпе %1$s уйдёт на %2$s раньше</string>
+    <string name="pl_walking">Идёте</string>
+    <string name="pl_to_go">осталось %1$s</string>
+    <string name="pl_at_stop">На остановке</string>
+    <string name="pl_distance_km">%1$s км</string>
 </resources>

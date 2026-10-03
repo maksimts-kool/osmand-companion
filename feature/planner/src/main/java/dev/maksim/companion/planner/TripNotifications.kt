@@ -36,10 +36,12 @@ object TripNotifications {
     /** The next step: [title] and [text] for the notification and the Trips tab, [widget] and [where] for OsmAnd's. */
     class Texts(val title: String, val text: String, val widget: String, val where: String)
 
-    fun texts(context: Context, trip: ActiveTrip, progress: TripProgress.Progress, now: Long): Texts {
+    /** With [walk], OsmAnd's ETA where it's walking you now ([OsmAndTrip.walkTarget]) is in it. */
+    fun texts(context: Context, trip: ActiveTrip, progress: TripProgress.Progress, now: Long, walk: OsmAndTrip.Navigation? = null): Texts {
         val legs = trip.itinerary.legs
         val leg = legs[progress.leg]
         val soon = TransitFormat.relative(context, progress.until, now) ?: TransitFormat.clockWithDay(progress.until, now)
+        val osmand = walk?.let { osmandText(context, it, leg.takeIf { !it.isWalk }, now) }
         val destination = trip.destination.name
         return when (progress.kind) {
             Kind.LEAVE -> {
@@ -54,14 +56,14 @@ object TripNotifications {
                     if (walk > 0) context.getString(R.string.pl_step_walk_to_catch, ItineraryViews.duration(context, walk), leg.from.name, catch)
                     else context.getString(R.string.pl_step_catch_at, catch, leg.from.name)
                 }
-                Texts(title, text, context.getString(R.string.pl_widget_leave, soon), if (ride == null) destination else leg.from.name)
+                Texts(title, listOfNotNull(text, osmand).joinToString(" · "), context.getString(R.string.pl_widget_leave, soon), if (ride == null) destination else leg.from.name)
             }
             Kind.TO_STOP -> {
                 val ride = leg.ride!!
                 val live = if (leg.from.isLive) liveText(context, leg.from) else null
                 Texts(
                     context.getString(R.string.pl_step_wait, ItineraryViews.vehicle(context, ride), ride.headsign, TransitFormat.clock(leg.departure)),
-                    listOfNotNull(context.getString(R.string.pl_step_wait_text, leg.from.name, soon), live).joinToString(" · "),
+                    listOfNotNull(context.getString(R.string.pl_step_wait_text, leg.from.name, soon), live, osmand).joinToString(" · "),
                     context.getString(R.string.pl_widget_ride, ride.route, soon),
                     leg.from.name,
                 )
@@ -85,13 +87,28 @@ object TripNotifications {
                     leg.to.name,
                 )
             }
-            Kind.WALK_THERE -> Texts(
-                context.getString(R.string.pl_step_walk, destination),
-                context.getString(R.string.pl_arrive, TransitFormat.clock(progress.until)).replaceFirstChar { it.titlecase() },
-                context.getString(R.string.pl_widget_walk, soon),
-                destination,
-            )
+            Kind.WALK_THERE -> {
+                // OsmAnd's ETA, if it's walking you there.
+                val there = walk?.arrival ?: progress.until
+                Texts(
+                    context.getString(R.string.pl_step_walk, destination),
+                    listOfNotNull(context.getString(R.string.pl_arrive, TransitFormat.clock(there)).replaceFirstChar { it.titlecase() }, osmand)
+                        .joinToString(" · "),
+                    context.getString(R.string.pl_widget_walk, TransitFormat.relative(context, there, now) ?: TransitFormat.clockWithDay(there, now)),
+                    destination,
+                )
+            }
             Kind.ARRIVED -> Texts(context.getString(R.string.pl_step_arrived, destination), "", "✓", destination)
+        }
+    }
+
+    /** "OsmAnd: there in 6 min"; or, walking to [ride]'s stop too slowly for it, by how much it'll be missed. */
+    private fun osmandText(context: Context, walk: OsmAndTrip.Navigation, ride: Leg?, now: Long): String {
+        val late = ride?.let { walk.arrival - it.departure }?.takeIf { it > 0 }
+        return if (late != null) {
+            context.getString(R.string.pl_eta_miss, ItineraryViews.vehicle(context, ride.ride!!), ItineraryViews.duration(context, late))
+        } else {
+            context.getString(R.string.pl_osmand_there_in, TransitFormat.relative(context, walk.arrival, now) ?: TransitFormat.clock(walk.arrival))
         }
     }
 
@@ -106,16 +123,28 @@ object TripNotifications {
         }
     }
 
-    /** The trip's notification, counting down to [TripProgress.Progress.until]. */
-    fun ongoing(context: Context, trip: ActiveTrip, progress: TripProgress.Progress, now: Long) {
-        val texts = texts(context, trip, progress, now)
+    /**
+     * The trip's notification, counting down to [TripProgress.Progress.until]; [walk] as for [texts], [walking] as for
+     * [TripSteps.fraction].
+     */
+    fun ongoing(
+        context: Context,
+        trip: ActiveTrip,
+        progress: TripProgress.Progress,
+        now: Long,
+        walk: OsmAndTrip.Navigation? = null,
+        walking: Pair<Int, Float>? = null,
+    ) {
+        val texts = texts(context, trip, progress, now, walk)
+        // On the last walk, there when OsmAnd says.
+        val end = walk?.takeIf { progress.kind == Kind.WALK_THERE }?.arrival ?: trip.itinerary.end
         val ride = trip.itinerary.legs[progress.leg].ride
         val builder = NotificationCompat.Builder(context, channel(context))
             .setSmallIcon(dev.maksim.companion.core.R.drawable.ic_notification)
             .setContentTitle(texts.title)
             .setContentText(texts.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(texts.text))
-            .setSubText(context.getString(R.string.pl_trip_arrive, TransitFormat.clock(trip.itinerary.end), trip.destination.name))
+            .setSubText(context.getString(R.string.pl_trip_arrive, TransitFormat.clock(end), trip.destination.name))
             .setColor(ride?.let { Mode.of(it.mode).color } ?: context.getColor(TtR.color.tt_osm_accent))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -125,9 +154,9 @@ object TripNotifications {
             .addAction(0, context.getString(R.string.pl_trip_new_way), action(context, TripActionReceiver.ACTION_REPLAN))
             .addAction(0, context.getString(R.string.pl_trip_stop), action(context, TripActionReceiver.ACTION_STOP))
         if (progress.kind != Kind.ARRIVED) {
-            builder.setWhen(progress.until).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
-            // How far along the whole way it is.
-            builder.setProgress(PROGRESS_MAX, (TripSteps.fraction(trip.itinerary, now) * PROGRESS_MAX).toInt(), false)
+            builder.setWhen(if (progress.kind == Kind.WALK_THERE) end else progress.until).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
+            // How far along the whole way it is; on foot, by how far it's been walked.
+            builder.setProgress(PROGRESS_MAX, (TripSteps.fraction(trip.itinerary, now, walking) * PROGRESS_MAX).toInt(), false)
         }
         notify(context, ONGOING_ID, builder)
     }

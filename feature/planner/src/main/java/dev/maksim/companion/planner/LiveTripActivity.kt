@@ -20,7 +20,9 @@ import com.airbnb.lottie.model.KeyPath
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import dev.maksim.companion.core.Analytics
+import dev.maksim.companion.core.companion
 import dev.maksim.companion.core.padForSystemBars
 import dev.maksim.companion.planner.TripSteps.Kind
 import dev.maksim.companion.planner.databinding.PlActivityLiveBinding
@@ -29,6 +31,7 @@ import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.Rows
 import dev.maksim.companion.timetable.TransitFormat
 import dev.maksim.companion.timetable.TripLineView
+import java.util.concurrent.Executors
 import dev.maksim.companion.timetable.R as TtR
 
 /**
@@ -52,9 +55,16 @@ class LiveTripActivity : AppCompatActivity() {
 
     private val tripChanged = Runnable { if (!isDestroyed) render() }
 
+    private val background = Executors.newSingleThreadExecutor()
+
+    /** Where OsmAnd has you, and its navigation to where the trip walks to now (asked about), if any. */
+    private var position: Pair<Call, OsmAndTrip.Position>? = null
+    private var positionAt = 0L
+
     private val tick = object : Runnable {
         override fun run() {
             render()
+            askOsmAnd()
             binding.root.postDelayed(this, TICK_MS)
         }
     }
@@ -98,13 +108,59 @@ class LiveTripActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         TripStore.removeListener(tripChanged)
+        background.shutdownNow()
         super.onDestroy()
+    }
+
+    /**
+     * Asks OsmAnd where you are, and whether it's walking you to where the trip walks to now (the stop of the next
+     * ride, or the end): how far along the walk it is goes by that, its ETA for the planner's guess, and once you're
+     * there, the trip goes on to the next step ([TripPosition.update]), however early.
+     */
+    private fun askOsmAnd() {
+        val trip = TripStore.current(this) ?: return
+        val now = System.currentTimeMillis()
+        val target = OsmAndTrip.walkTarget(trip.itinerary, TripProgress.at(trip.itinerary, now, trip.reached)) ?: run {
+            position = null
+            return
+        }
+        val osmand = companion.osmand
+        background.execute {
+            val found = runCatching { OsmAndTrip.position(osmand, target) }.getOrNull()
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                // OsmAnd was navigating there a moment ago, and has stopped: it got you there.
+                val before = position?.takeIf { (to, _) -> to.lat == target.lat && to.lon == target.lon }?.second?.navigation
+                position = found?.let { target to it }
+                positionAt = System.currentTimeMillis()
+                val latest = TripStore.current(this) ?: return@runOnUiThread
+                val updated = TripPosition.update(latest, found?.here, found?.navigation, positionAt, TripPosition.osmandArrived(before, found))
+                // Saving it renders it.
+                if (updated !== latest) TripStore.save(this, updated) else render()
+            }
+        }
+    }
+
+    /** OsmAnd's position, if it said lately. */
+    private fun fresh(): Pair<Call, OsmAndTrip.Position>? = position?.takeIf { System.currentTimeMillis() - positionAt < POSITION_FRESH_MS }
+
+    /** OsmAnd's ETA to [call], if it's walking you there and said so lately. */
+    private fun navigationTo(call: Call): OsmAndTrip.Navigation? =
+        fresh()?.takeIf { (to, _) -> to.lat == call.lat && to.lon == call.lon }?.second?.navigation
+
+    /** The walk being walked now, by its index, and how far along it is; null if none, or OsmAnd hasn't said. */
+    private fun walking(trip: ActiveTrip, now: Long): Pair<Int, TripPosition.Walked>? {
+        val itinerary = trip.itinerary
+        val index = TripPosition.walkingLeg(itinerary, TripProgress.at(itinerary, now, trip.reached), trip.reached) ?: return null
+        val leg = itinerary.legs[index]
+        return TripPosition.walked(leg, fresh()?.second?.here, navigationTo(leg.to))?.let { index to it }
     }
 
     private fun look(by: Int) {
         val trip = TripStore.current(this) ?: return finish()
         val steps = TripSteps.of(trip.itinerary)
-        val at = (viewing ?: TripSteps.current(trip.itinerary, steps, System.currentTimeMillis())) + by
+        val located = fresh()?.second?.here != null
+        val at = (viewing ?: TripSteps.current(trip.itinerary, steps, System.currentTimeMillis(), trip.reached, located)) + by
         viewing = at.coerceIn(0, steps.lastIndex)
         render()
     }
@@ -114,7 +170,8 @@ class LiveTripActivity : AppCompatActivity() {
         val itinerary = trip.itinerary
         val now = System.currentTimeMillis()
         val steps = TripSteps.of(itinerary)
-        val current = TripSteps.current(itinerary, steps, now)
+        val walking = walking(trip, now)
+        val current = TripSteps.current(itinerary, steps, now, trip.reached, located = fresh()?.second?.here != null)
         // On to the next step: follow it again.
         if (current != lastCurrent) {
             if (lastCurrent >= 0) viewing = null
@@ -123,22 +180,29 @@ class LiveTripActivity : AppCompatActivity() {
         val shown = (viewing ?: current).coerceIn(0, steps.lastIndex)
         val live = getColor(TtR.color.tt_live)
 
-        binding.left.text = ItineraryViews.countdown(itinerary.end - now).toString()
-        binding.eta.text = TransitFormat.clock(itinerary.end)
+        // On the last walk, OsmAnd's ETA, if it's walking you there.
+        val end = itinerary.legs.last().takeIf { it.isWalk && steps[current].kind == Kind.WALK_THERE }
+            ?.let { navigationTo(it.to)?.arrival } ?: itinerary.end
+        binding.left.text = ItineraryViews.countdown(end - now).toString()
+        binding.eta.text = TransitFormat.clock(end)
         Rows.liveMark(binding.live, itinerary.isLive, live)
         binding.pill.contentDescription = getString(R.string.pl_trip_arrive, TransitFormat.clock(itinerary.end), trip.destination.name)
-        binding.tripProgress.setProgressCompat((TripSteps.fraction(itinerary, now) * PROGRESS_MAX).toInt(), true)
+        val fraction = TripSteps.fraction(
+            itinerary, now,
+            walking?.let { (index, walked) -> index to walked.fraction } ?: TripPosition.walkedTo(trip, TripProgress.at(itinerary, now, trip.reached)),
+        )
+        binding.tripProgress.setProgressCompat((fraction * PROGRESS_MAX).toInt(), true)
 
-        instruction(trip, steps[shown], isCurrent = shown == current, now)
+        instruction(trip, steps[shown], isCurrent = shown == current, now, walking)
         dots(steps.size, shown, current)
         binding.prev.isEnabled = shown > 0
         binding.next.isEnabled = shown < steps.lastIndex
         binding.now.isVisible = shown != current
-        page(trip, steps[shown], shown == current, now)
+        page(trip, steps[shown], shown == current, now, walking?.takeIf { shown == current })
     }
 
     /** What to do at [step], as the card on top says it: "Walk to stop · Koidu · 3 min". */
-    private fun instruction(trip: ActiveTrip, step: TripSteps.Step, isCurrent: Boolean, now: Long) {
+    private fun instruction(trip: ActiveTrip, step: TripSteps.Step, isCurrent: Boolean, now: Long, walking: Pair<Int, TripPosition.Walked>?) {
         val legs = trip.itinerary.legs
         val leg = legs[step.leg]
         val ride = leg.ride
@@ -156,6 +220,33 @@ class LiveTripActivity : AppCompatActivity() {
             Kind.ARRIVED -> Triple("", getString(R.string.pl_step_arrived, trip.destination.name), null)
         }
         binding.headline.text = headline
+        val primary = MaterialColors.getColor(binding.away, androidx.appcompat.R.attr.colorPrimary)
+        // On the way, by where OsmAnd has you: OsmAnd's ETA if it's walking you, else how far there is to go.
+        val walk = walking?.takeIf { isCurrent }
+        if (walk != null) {
+            val (index, walked) = walk
+            val walkLeg = legs[index]
+            val osmand = navigationTo(walkLeg.to)
+            if (osmand != null || walked.fraction >= STARTED || now >= walkLeg.departure) {
+                binding.headline.text = if (index == legs.lastIndex) trip.destination.name else walkLeg.to.name
+                binding.kicker.setText(if (osmand != null) R.string.pl_walking_osmand else R.string.pl_walking)
+                binding.kicker.isVisible = true
+                binding.away.isVisible = true
+                binding.away.text = osmand?.let { TransitFormat.relative(this, it.arrival, now) ?: TransitFormat.clock(it.arrival) }
+                    ?: ItineraryViews.distance(this, walked.metersLeft.toDouble())
+                binding.away.setTextColor(primary)
+                return
+            }
+        }
+        // Got to the stop: waiting there.
+        if (step.kind == Kind.BOARD && isCurrent && TripProgress.stopKey(leg.from) in trip.reached) {
+            binding.kicker.text = "${getString(R.string.pl_at_stop)} · $kicker"
+            binding.kicker.isVisible = true
+            binding.away.isVisible = true
+            binding.away.text = TransitFormat.relative(this, leg.departure, now)?.takeIf { leg.departure >= now } ?: TransitFormat.clock(leg.departure)
+            binding.away.setTextColor(if (leg.from.isLive) getColor(TtR.color.tt_live) else primary)
+            return
+        }
         // Not yet left: when to, and how long the walk is.
         if (step.kind == Kind.WALK && isCurrent && now < leg.departure) {
             binding.kicker.text = "${ItineraryViews.leave(this, leg.departure, now)} · ${getString(R.string.pl_walk_to_stop).lowercase()}"
@@ -207,7 +298,7 @@ class LiveTripActivity : AppCompatActivity() {
     }
 
     /** The step in full, under the card on top. */
-    private fun page(trip: ActiveTrip, step: TripSteps.Step, isCurrent: Boolean, now: Long) {
+    private fun page(trip: ActiveTrip, step: TripSteps.Step, isCurrent: Boolean, now: Long, walking: Pair<Int, TripPosition.Walked>?) {
         val key = "${trip.version}:$step"
         if (step.kind == Kind.ARRIVED && key == pageKey) return
         pageKey = key
@@ -216,15 +307,22 @@ class LiveTripActivity : AppCompatActivity() {
         val itinerary = trip.itinerary
         val leg = itinerary.legs[step.leg]
         when (step.kind) {
-            Kind.WALK -> walkPage(page, itinerary, step.leg, leg)
+            Kind.WALK -> walkPage(page, itinerary, step.leg, leg, now, walking?.takeIf { it.first == step.leg }?.second)
             Kind.BOARD -> boardPage(page, trip, step.leg, leg, now)
             Kind.RIDE -> ridePage(page, trip, leg, isCurrent, now)
             Kind.WALK_THERE -> {
                 val card = ItineraryActivity.stepCard(layoutInflater, page, R.drawable.pl_ic_walk, getColor(R.color.pl_go))
                 card.title.setText(R.string.pl_walk_to_destination)
-                ItineraryActivity.subtitle(card, walkText(leg, trip.itinerary.end))
-                ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+                val osmand = navigationTo(leg.to)
+                if (osmand != null) {
+                    ItineraryActivity.subtitle(card, osmandText(osmand))
+                    ItineraryActivity.minutes(card, osmand.left, countdown = true)
+                } else {
+                    ItineraryActivity.subtitle(card, walkText(leg, trip.itinerary.end))
+                    ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+                }
                 card.body.isVisible = true
+                walking?.takeIf { it.first == step.leg }?.let { walkProgress(card.body, it.second) }
                 osmandButton(card.body, leg.to.copy(name = trip.destination.name))
             }
             Kind.ARRIVED -> arrivedPage(page, trip)
@@ -232,13 +330,22 @@ class LiveTripActivity : AppCompatActivity() {
     }
 
     /** Walk to the stop: how far, by when, the ride it's for, and OsmAnd to walk there with. */
-    private fun walkPage(page: ViewGroup, itinerary: Itinerary, index: Int, leg: Leg) {
+    private fun walkPage(page: ViewGroup, itinerary: Itinerary, index: Int, leg: Leg, now: Long, walked: TripPosition.Walked?) {
         val card = ItineraryActivity.stepCard(layoutInflater, page, R.drawable.pl_ic_walk, getColor(R.color.pl_go))
         card.title.text = getString(R.string.pl_step_walk, leg.to.name)
-        ItineraryActivity.subtitle(card, walkText(leg, leg.arrival))
-        ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+        val osmand = navigationTo(leg.to)
+        if (osmand != null) {
+            ItineraryActivity.subtitle(card, osmandText(osmand))
+            ItineraryActivity.minutes(card, osmand.left, countdown = true)
+        } else {
+            ItineraryActivity.subtitle(card, walkText(leg, leg.arrival))
+            ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+        }
         card.body.isVisible = true
-        itinerary.legs.drop(index + 1).firstOrNull { !it.isWalk }?.let { next ->
+        walked?.let { walkProgress(card.body, it) }
+        val next = itinerary.legs.drop(index + 1).firstOrNull { !it.isWalk }
+        if (osmand != null && next != null && next.departure >= now) catchLine(card.body, osmand, next)
+        next?.let { next ->
             val ride = next.ride!!
             card.body.addView(
                 TextView(this).apply {
@@ -280,6 +387,8 @@ class LiveTripActivity : AppCompatActivity() {
             },
         )
         card.from.text = getString(R.string.pl_leaving_from, leg.from.name, TransitFormat.clock(leg.departure))
+        // Still walking there with OsmAnd: whether it'll be in time.
+        navigationTo(leg.from)?.takeIf { leg.departure >= now }?.let { catchLine(card.content, it, leg) }
 
         // Only the first ride has a choice, and only while it's still to come.
         val first = trip.itinerary.legs.indexOfFirst { !it.isWalk } == index
@@ -380,9 +489,70 @@ class LiveTripActivity : AppCompatActivity() {
         )
     }
 
+    /** "OsmAnd: 420 m · there at 19:24". */
+    private fun osmandText(navigation: OsmAndTrip.Navigation): String = getString(
+        R.string.pl_osmand_eta, ItineraryViews.distance(this, navigation.meters.toDouble()), TransitFormat.clock(navigation.arrival),
+    )
+
+    /** How far along the walk it is, by where OsmAnd has you: a bar, and "220 m to go". */
+    private fun walkProgress(parent: ViewGroup, walked: TripPosition.Walked) {
+        parent.addView(
+            LinearProgressIndicator(this).apply {
+                max = PROGRESS_MAX
+                setIndicatorColor(getColor(R.color.pl_go))
+                trackCornerRadius = dp(3)
+                trackThickness = dp(6)
+                setProgressCompat((walked.fraction * PROGRESS_MAX).toInt(), false)
+            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(dp(16), dp(2), dp(16), dp(4))
+            },
+        )
+        parent.addView(
+            TextView(this).apply {
+                text = getString(R.string.pl_to_go, ItineraryViews.distance(this@LiveTripActivity, walked.metersLeft.toDouble()))
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setPadding(dp(16), 0, dp(16), dp(6))
+            },
+        )
+    }
+
+    /**
+     * Whether OsmAnd has you at [ride]'s stop before it leaves: "You'll be there 3 min before Bus 24A leaves", in
+     * green; or, in red, by how much it'll be missed at this pace.
+     */
+    private fun catchLine(parent: ViewGroup, navigation: OsmAndTrip.Navigation, ride: Leg) {
+        val margin = ride.departure - navigation.arrival
+        val vehicle = ItineraryViews.vehicle(this, ride.ride!!)
+        val missed = margin < 0
+        parent.addView(
+            TextView(this).apply {
+                text = if (missed) getString(R.string.pl_eta_miss, vehicle, ItineraryViews.duration(this@LiveTripActivity, -margin))
+                else getString(R.string.pl_eta_ahead, ItineraryViews.duration(this@LiveTripActivity, margin), vehicle)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
+                val color = getColor(
+                    when {
+                        missed -> TtR.color.tt_offline_strike
+                        margin < ItineraryViews.TIGHT_MS -> TtR.color.tt_late
+                        else -> TtR.color.tt_live
+                    },
+                )
+                setTextColor(color)
+                if (missed || margin < ItineraryViews.TIGHT_MS) {
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(TtR.drawable.tt_ic_warning, 0, 0, 0)
+                    compoundDrawableTintList = ColorStateList.valueOf(color)
+                    compoundDrawablePadding = dp(6)
+                }
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(4), dp(16), dp(6))
+            },
+        )
+    }
+
     /** "200 m · be there by 18:49", or just by when. */
     private fun walkText(leg: Leg, by: Long): String {
-        val distance = leg.distance.takeIf { it > 0 }?.let { getString(R.string.pl_walk_distance, ItineraryViews.roundMeters(it)) }
+        val distance = leg.distance.takeIf { it > 0 }?.let { ItineraryViews.distance(this, it) }
         return if (distance != null) getString(R.string.pl_be_there_by, distance, TransitFormat.clock(by))
         else getString(R.string.pl_arrive_at, TransitFormat.clock(by))
     }
@@ -419,6 +589,12 @@ class LiveTripActivity : AppCompatActivity() {
         private const val TICK_MS = 5_000L
         private const val PROGRESS_MAX = 1000
         private const val MAX_OPTIONS = 5
+
+        /** OsmAnd is asked every tick; what it said longer ago than this is gone (it stopped answering). */
+        private const val POSITION_FRESH_MS = 3 * TICK_MS
+
+        /** This far along a walk before leaving time, it's being walked already. */
+        private const val STARTED = 0.1f
 
         /** The trip being taken: from its notification, OsmAnd's widget, the Trips tab, or GO. */
         fun intent(context: Context): Intent = Intent(context, LiveTripActivity::class.java)

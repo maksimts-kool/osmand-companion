@@ -43,6 +43,9 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
     @Volatile
     private var handler: Handler? = null
 
+    /** Where OsmAnd was navigating to, of the trip's, and how, when last asked. Worker thread only. */
+    private var navigating: Pair<Pair<Double, Double>, OsmAndTrip.Navigation>? = null
+
     /** The OsmAnd the widget was added to; it forgets widgets when it restarts. Worker thread only. */
     private var widgetIn: IOsmAndAidlInterface? = null
 
@@ -96,27 +99,44 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
         val options = stored.options.takeIf { stored.itinerary.rides.firstOrNull()?.let { now < it.departure } == true }.orEmpty()
         val fresh = runCatching { planner.refresh(listOf(stored.itinerary) + options) }.getOrNull()
         val itinerary = fresh?.first() ?: stored.itinerary
-        // Stopped, or planned again or another departure taken, while the live times came in.
-        if (TripStore.current(context)?.version != stored.version) return
-        var trip = stored.copy(itinerary = itinerary, options = fresh?.drop(1) ?: options)
-        if (now > itinerary.end + DONE_AFTER_MS) return TripStore.stop(context, arrived = true)
+        // Stopped, or planned again or another departure taken, while the live times came in. The trip as it is now
+        // otherwise: the live screen may have noted a stop got to, or the get off alert turned off, meanwhile.
+        val latest = TripStore.current(context) ?: return
+        if (latest.version != stored.version) return
+        var trip = latest.copy(itinerary = itinerary, options = fresh?.drop(1) ?: options)
+        // There: when the timetable says so, or when OsmAnd had you there, if that was sooner.
+        val there = minOf(itinerary.end, trip.reached[TripProgress.END] ?: Long.MAX_VALUE)
+        if (now > there + DONE_AFTER_MS) return TripStore.stop(context, arrived = true)
         TripProgress.missed(itinerary, now)?.let { leg ->
             if (now - trip.replannedAt >= REPLAN_EVERY_MS) trip = replan(trip, leg, now)
         }
         finish(trip, now)
     }
 
-    /** Gives [trip]'s alerts due at [now], keeps it, and shows its next step. */
-    private fun finish(trip: ActiveTrip, now: Long) {
-        val progress = TripProgress.at(trip.itinerary, now)
+    /**
+     * Notes where OsmAnd has you (a stop or the end got to: [TripPosition]), gives [trip]'s alerts due at [now], keeps
+     * it, and shows its next step.
+     */
+    private fun finish(found: ActiveTrip, now: Long) {
+        val target = OsmAndTrip.walkTarget(found.itinerary, TripProgress.at(found.itinerary, now, found.reached))
+        val position = target?.let { runCatching { OsmAndTrip.position(osmand, it, now) }.getOrNull() }
+        // OsmAnd was navigating there when last asked, and has stopped: it got you there.
+        val before = navigating?.takeIf { (to, _) -> target != null && to == target.lat to target.lon }?.second
+        navigating = position?.navigation?.let { (target!!.lat to target.lon) to it }
+        val trip = TripPosition.update(found, position?.here, position?.navigation, now, TripPosition.osmandArrived(before, position))
+        if (trip !== found) AppLog.log("Trip: got to ${target?.name}")
+        val progress = TripProgress.at(trip.itinerary, now, trip.reached)
         val (alerts, noted) = TripProgress.alerts(trip, progress, now)
         for (alert in alerts) {
             val (title, text) = TripNotifications.alertTexts(context, noted, alert, now)
             TripNotifications.alert(context, title, text)
         }
         TripStore.save(context, noted)
-        TripNotifications.ongoing(context, noted, progress, now)
-        showWidget(noted, progress, now)
+        // OsmAnd's ETA, if it's walking you where the trip still walks to.
+        val walk = position?.navigation?.takeIf { trip === found }
+        val walking = TripPosition.walking(noted, progress, position?.here, walk)
+        TripNotifications.ongoing(context, noted, progress, now, walk, walking)
+        showWidget(noted, progress, now, walk)
     }
 
     /**
@@ -164,10 +184,10 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
     }
 
     /** OsmAnd's "Trip (live)" widget: "23 · 4 min" over where. Added again whenever OsmAnd has forgotten it. */
-    private fun showWidget(trip: ActiveTrip, progress: TripProgress.Progress, now: Long) {
+    private fun showWidget(trip: ActiveTrip, progress: TripProgress.Progress, now: Long, walk: OsmAndTrip.Navigation?) {
         val api = osmand.api ?: return
         if (!osmand.hasAccess) return
-        val texts = TripNotifications.texts(context, trip, progress, now)
+        val texts = TripNotifications.texts(context, trip, progress, now, walk)
         val ride = trip.itinerary.legs[progress.leg].ride
         val icon = when {
             progress.kind == Kind.ARRIVED -> ICON_ARRIVED

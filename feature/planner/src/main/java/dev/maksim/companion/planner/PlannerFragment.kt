@@ -231,7 +231,7 @@ class PlannerFragment : Fragment() {
         binding.tripCard.visibility = if (trip == null) View.GONE else View.VISIBLE
         trip ?: return
         val now = System.currentTimeMillis()
-        val texts = TripNotifications.texts(context, trip, TripProgress.at(trip.itinerary, now), now)
+        val texts = TripNotifications.texts(context, trip, TripProgress.at(trip.itinerary, now, trip.reached), now)
         binding.tripDestination.text = getString(R.string.pl_trip_banner, trip.destination.name)
         binding.tripStep.text = texts.title
         binding.tripText.text = texts.text

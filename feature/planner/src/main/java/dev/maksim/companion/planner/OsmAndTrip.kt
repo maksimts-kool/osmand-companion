@@ -3,9 +3,11 @@ package dev.maksim.companion.planner
 import android.content.Context
 import android.content.Intent
 import dev.maksim.companion.core.OsmAndConnection
+import dev.maksim.companion.timetable.LatLon
 import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.OsmAndRoute
 import dev.maksim.companion.timetable.TransitFormat
+import dev.maksim.companion.timetable.distanceMeters
 import net.osmand.aidlapi.navigation.NavigateParams
 
 /**
@@ -22,6 +24,9 @@ object OsmAndTrip {
 
     /** OsmAnd's profile for walking. */
     private const val PEDESTRIAN = "pedestrian"
+
+    /** OsmAnd navigating to within this of a stop is navigating to it. */
+    private const val SAME_PLACE_M = 60.0
 
     /** Draws [itinerary] to [destination] in OsmAnd with its card open; the caller brings OsmAnd to the front. */
     fun show(context: Context, osmand: OsmAndConnection, itinerary: Itinerary, destination: String): Boolean {
@@ -62,6 +67,52 @@ object OsmAndTrip {
         // No start: from where OsmAnd has you.
         it.navigate(NavigateParams(null, 0.0, 0.0, stop.name, stop.lat, stop.lon, PEDESTRIAN, true, true))
     } == true
+
+    /** OsmAnd's navigation as it is: [left] ms and [meters] to go, there at [arrival] (epoch ms). */
+    class Navigation(val left: Long, val meters: Int, val arrival: Long)
+
+    /**
+     * OsmAnd's own ETA for walking to [to], if it's navigating there now (as *Walk there with OsmAnd* starts it): its
+     * route goes by the streets as you walk them, where the planner's walk is a guess. Null if it navigates elsewhere,
+     * or not at all.
+     */
+    fun navigationTo(osmand: OsmAndConnection, to: Call, now: Long = System.currentTimeMillis()): Navigation? =
+        position(osmand, to, now)?.navigation
+
+    /**
+     * Where OsmAnd has you ([here]; while OsmAnd is in the background, only as of when it last had its map up), and its
+     * [navigation] to the place asked about, if it's navigating there. [routeDone]: OsmAnd's destination is that place
+     * but there's no way left to go, as with its map up once it's got you there (in the background it clears the
+     * destination straight away instead: [TripPosition.osmandArrived]).
+     */
+    class Position(val here: LatLon?, val navigation: Navigation?, val routeDone: Boolean = false)
+
+    /** Where OsmAnd has you, and its ETA to [to] as for [navigationTo], in one go; null if OsmAnd can't be asked. */
+    fun position(osmand: OsmAndConnection, to: Call, now: Long = System.currentTimeMillis()): Position? {
+        if (!osmand.hasAccess) return null
+        val info = osmand.call("getAppInfo") { it.appInfo } ?: return null
+        val here = info.lastKnownLocation?.takeIf { it.latitude != 0.0 || it.longitude != 0.0 }?.let { LatLon(it.latitude, it.longitude) }
+        val destination = info.destinationLocation
+        val goingThere = destination != null && distanceMeters(destination.latitude, destination.longitude, to.lat, to.lon) <= SAME_PLACE_M
+        val navigation = if (goingThere && info.leftTime > 0) {
+            val left = info.leftTime * 1000L
+            Navigation(left, info.leftDistance, info.arrivalTime.takeIf { it > now } ?: (now + left))
+        } else {
+            null
+        }
+        return Position(here, navigation, routeDone = goingThere && info.leftTime <= 0)
+    }
+
+    /** Where a trip at [progress] is walking to, if it is: the stop of the next ride, or the end. */
+    fun walkTarget(itinerary: Itinerary, progress: TripProgress.Progress): Call? {
+        val legs = itinerary.legs
+        val leg = legs.getOrNull(progress.leg) ?: return null
+        return when (progress.kind) {
+            TripProgress.Kind.LEAVE, TripProgress.Kind.TO_STOP -> if (leg.isWalk) leg.to else leg.from
+            TripProgress.Kind.WALK_THERE -> legs.last().to
+            else -> null
+        }
+    }
 
     /** What OsmAnd knows of where things are. */
     class Places(val myLocation: Place?, val destination: Place?, val mapCenter: Place?)

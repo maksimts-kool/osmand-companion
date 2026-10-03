@@ -33,6 +33,8 @@ data class ActiveTrip(
     val options: List<Itinerary> = emptyList(),
     /** Whether to be told to get off at the next stop. */
     val getOffAlert: Boolean = true,
+    /** The stops (and the end) got to on foot, and when ([TripProgress.stopKey], [TripProgress.END]). */
+    val reached: Map<String, Long> = emptyMap(),
 ) : Serializable
 
 /**

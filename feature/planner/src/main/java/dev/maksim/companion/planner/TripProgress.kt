@@ -3,9 +3,10 @@ package dev.maksim.companion.planner
 import kotlin.math.abs
 
 /**
- * Where a trip being taken is, going by its times as they're expected now: what to do next and until when ([at]);
- * which ride can't be caught any more ([missed]); and what's worth an alert ([alerts]). Nothing here knows where the
- * phone is: a ride whose time has come is taken as being ridden.
+ * Where a trip being taken is, going by its times as they're expected now and the places it has got to on foot
+ * ([ActiveTrip.reached], from OsmAnd's location: [TripPosition]): what to do next and until when ([at]); which ride
+ * can't be caught any more ([missed]); and what's worth an alert ([alerts]). Already at the stop, it's waiting there,
+ * whatever the time; there early, it's there. A ride whose time has come is taken as being ridden.
  */
 object TripProgress {
 
@@ -28,9 +29,16 @@ object TripProgress {
     /** [kind] of step, the leg it's about (the next ride, the one ridden, or the last walk), and until when. */
     data class Progress(val kind: Kind, val leg: Int, val until: Long, val stopsLeft: Int = 0)
 
-    fun at(itinerary: Itinerary, now: Long): Progress {
+    fun at(itinerary: Itinerary, now: Long, reached: Map<String, Long> = emptyMap()): Progress {
         val legs = itinerary.legs
-        if (now < itinerary.start) return Progress(Kind.LEAVE, legs.indexOfFirst { !it.isWalk }.coerceAtLeast(0), itinerary.start)
+        val firstRide = legs.indexOfFirst { !it.isWalk }
+        if (now < itinerary.start) {
+            return when {
+                firstRide >= 0 && stopKey(legs[firstRide].from) in reached -> Progress(Kind.TO_STOP, firstRide, legs[firstRide].departure)
+                firstRide < 0 && END in reached -> Progress(Kind.ARRIVED, legs.lastIndex, itinerary.end)
+                else -> Progress(Kind.LEAVE, firstRide.coerceAtLeast(0), itinerary.start)
+            }
+        }
         for ((i, leg) in legs.withIndex()) {
             if (!leg.isWalk && leg.departure <= now && now < leg.arrival) {
                 return Progress(Kind.RIDE, i, leg.arrival, leg.stops.count { it.expected > now } + 1)
@@ -39,8 +47,14 @@ object TripProgress {
         legs.indices.firstOrNull { !legs[it].isWalk && legs[it].departure > now }?.let {
             return Progress(Kind.TO_STOP, it, legs[it].departure)
         }
-        return Progress(if (now < itinerary.end) Kind.WALK_THERE else Kind.ARRIVED, legs.lastIndex, itinerary.end)
+        return Progress(if (now < itinerary.end && END !in reached) Kind.WALK_THERE else Kind.ARRIVED, legs.lastIndex, itinerary.end)
     }
+
+    /** For [ActiveTrip.reached]: the stop of [call] got to on foot. */
+    fun stopKey(call: Call): String = "stop:${call.key}"
+
+    /** For [ActiveTrip.reached]: the end got to. */
+    const val END = "end"
 
     /**
      * The leg of the next ride if it can't be caught any more: the live feed says it has already left, or the ride
