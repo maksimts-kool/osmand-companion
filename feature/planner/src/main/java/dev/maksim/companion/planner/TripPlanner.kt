@@ -1,12 +1,12 @@
 package dev.maksim.companion.planner
 
 import dev.maksim.companion.core.AppLog
+import dev.maksim.companion.core.Parallel
 import dev.maksim.companion.timetable.PeatusClient
 import java.io.IOException
 import java.io.Serializable
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
-import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -29,8 +29,18 @@ class TripPlanner {
     /** From [from] to [to], leaving at [time] (epoch ms; null: now), or arriving by it. */
     data class Request(val from: Place, val to: Place, val time: Long?, val arriveBy: Boolean) : Serializable
 
-    /** What [plan] found at [at]; [failed] are the planners that didn't answer. */
-    class Result(val itineraries: List<Itinerary>, val at: Long, val failed: Set<Source>)
+    /**
+     * What [plan] found at [at]; [failed] are the planners that didn't answer. [plannedAt] is when the planners were
+     * asked, which [again] doesn't do; [found] is what they said, before the live times, and [request] what for.
+     */
+    class Result(
+        val itineraries: List<Itinerary>,
+        val at: Long,
+        val failed: Set<Source>,
+        val plannedAt: Long = at,
+        internal val found: List<Itinerary> = emptyList(),
+        internal val request: Request? = null,
+    )
 
     fun plan(request: Request): Result {
         val now = System.currentTimeMillis()
@@ -42,12 +52,11 @@ class TripPlanner {
             jobs += peatus.source to Callable { peatus.plan(from, to, now - LOOK_BACK_MS, false, LOOK_BACK_COUNT) }
         }
 
-        val pool = Executors.newFixedThreadPool(jobs.size)
         val found = ArrayList<Itinerary>()
         val answered = HashSet<Source>()
         var error: Throwable? = null
+        val futures: List<Pair<Source, Future<List<Itinerary>>>> = jobs.map { (source, job) -> source to Parallel.submit { job.call() } }
         try {
-            val futures: List<Pair<Source, Future<List<Itinerary>>>> = jobs.map { (source, job) -> source to pool.submit(job) }
             val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS)
             for ((source, future) in futures) {
                 try {
@@ -62,16 +71,34 @@ class TripPlanner {
                 }
             }
         } finally {
-            pool.shutdownNow()
+            // Those still going (this thread was interrupted): nobody's waiting for them.
+            futures.forEach { (_, future) -> future.cancel(true) }
         }
         val failed = jobs.map { it.first }.toSet() - answered
         if (answered.isEmpty()) {
             throw (error as? IOException) ?: IOException(error?.message ?: "no planner answered", error)
         }
 
-        val earliest = if (arriveBy) now else time
+        return Result(settle(found, request, now), now, failed, now, found, request)
+    }
+
+    /**
+     * [previous] at the live times now, without asking the planners again: the same ways, with the rides that can't
+     * be caught any more swapped for the next of their line, or left out. A lot less than [plan], for keeping what's
+     * on screen fresh; but no new ways come up, so [plan] again now and then.
+     */
+    fun again(previous: Result): Result {
+        val request = previous.request ?: return previous
+        val now = System.currentTimeMillis()
+        return Result(settle(previous.found, request, now), now, previous.failed, previous.plannedAt, previous.found, request)
+    }
+
+    /** [found] at the live times of [now], as they can be taken, best first. */
+    private fun settle(found: List<Itinerary>, request: Request, now: Long): List<Itinerary> {
+        val time = request.time ?: now
+        val earliest = if (request.arriveBy) now else time
         val settled = retimer.retime(found, now).mapNotNull { retimer.settle(it, earliest, now) }
-        return Result(Ranking.rank(settled, if (arriveBy) time else null), now, failed)
+        return Ranking.rank(settled, if (request.arriveBy) time else null)
     }
 
     /**

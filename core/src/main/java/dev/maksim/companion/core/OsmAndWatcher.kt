@@ -42,6 +42,11 @@ class OsmAndWatcher : AccessibilityService() {
                 if (osmand.call("getAppInfo") { it.appInfo }?.isMapVisible == true) onOsmAndInFront()
             }
             update()
+            // It isn't in use, and nothing here needs it: let it go. Connected, Android would keep it running (and
+            // bring it back if closed) until it's next opened and left.
+            if (!FollowOsmAnd.isOsmAndActive && !FollowOsmAnd.wantsService(this) && !companion.hasScreenOpen) {
+                osmand.disconnect()
+            }
         }, STARTUP_CHECK_MS)
     }
 

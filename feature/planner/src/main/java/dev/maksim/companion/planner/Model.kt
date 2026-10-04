@@ -1,6 +1,7 @@
 package dev.maksim.companion.planner
 
 import dev.maksim.companion.timetable.LatLon
+import dev.maksim.companion.timetable.Polyline
 import java.io.Serializable
 import kotlin.math.roundToInt
 
@@ -89,6 +90,27 @@ data class Leg(
 
     /** [shape], or straight lines between the calls. */
     val line: List<LatLon> get() = shape.ifEmpty { (listOf(from) + stops + to).map { it.point } }
+
+    /**
+     * Kept ([TripStore], every time a trip being taken changes) with its [shape] as an encoded polyline: a few bytes
+     * a point, rather than an object each. Read back as a [Leg] again.
+     */
+    private fun writeReplace(): Any = Saved(ride, from, to, stops, Polyline.encode(shape), distance)
+
+    private class Saved(
+        val ride: Ride?,
+        val from: Call,
+        val to: Call,
+        val stops: List<Call>,
+        val shape: String,
+        val distance: Double,
+    ) : Serializable {
+        private fun readResolve(): Any = Leg(ride, from, to, stops, Polyline.decode(shape), distance)
+
+        private companion object {
+            const val serialVersionUID = 1L
+        }
+    }
 }
 
 /** One way to get there: walks and rides, one after the other. */

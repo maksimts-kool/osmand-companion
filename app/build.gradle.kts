@@ -59,7 +59,11 @@ android {
     buildTypes {
         val release = signingConfigs.findByName("release")
         release {
-            isMinifyEnabled = false
+            // R8: a fraction of the code, so the APK is smaller and the app starts quicker. What it mustn't touch is in
+            // proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = release
         }
         debug {

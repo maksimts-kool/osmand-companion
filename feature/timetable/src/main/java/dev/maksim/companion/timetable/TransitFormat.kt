@@ -31,7 +31,21 @@ object Estonia {
     }
 
     fun format(pattern: String, time: Long, locale: Locale = Locale.getDefault()): String =
-        SimpleDateFormat(pattern, locale).apply { timeZone = this@Estonia.timeZone }.format(Date(time))
+        formatter(pattern, locale).format(Date(time))
+
+    /**
+     * A format for [pattern] in [locale] and Estonia's time, made once per thread: making one is slow, and the
+     * timetable screens format thousands of times. Not to be shared with another thread.
+     */
+    fun formatter(pattern: String, locale: Locale = Locale.getDefault()): SimpleDateFormat =
+        formatters.get()!!.getOrPut(pattern to locale) {
+            SimpleDateFormat(pattern, locale).apply { timeZone = this@Estonia.timeZone }
+        }
+
+    // Not ThreadLocal.withInitial, which is Android 8+.
+    private val formatters = object : ThreadLocal<HashMap<Pair<String, Locale>, SimpleDateFormat>>() {
+        override fun initialValue() = HashMap<Pair<String, Locale>, SimpleDateFormat>()
+    }
 }
 
 /** Distance in meters; plenty accurate for "has the map moved a few hundred meters". */

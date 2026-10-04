@@ -9,7 +9,6 @@ import dev.maksim.companion.timetable.graphQL
 import dev.maksim.companion.timetable.objects
 import dev.maksim.companion.timetable.optNullableString
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
@@ -179,7 +178,6 @@ class OtpPlanner(val source: Source) {
         private val LIVE_COPY = Regex("""^\d+_""")
 
         /** Midnight in Estonia starting service date [date] (yyyyMMdd), epoch ms. */
-        fun midnight(date: String): Long =
-            SimpleDateFormat("yyyyMMdd", Locale.ROOT).apply { timeZone = Estonia.timeZone }.parse(date)!!.time
+        fun midnight(date: String): Long = Estonia.formatter("yyyyMMdd", Locale.ROOT).parse(date)!!.time
     }
 }
