@@ -20,7 +20,7 @@ import dev.maksim.companion.update.Updater
 
 /**
  * Settings: starting and stopping with OsmAnd ([FollowOsmAnd]), crash reports and usage stats ([Analytics]), this
- * version with its update check, then what every feature logged, newest on top.
+ * version with its update check and the betas switch, then what every feature logged, newest on top.
  */
 class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
 
@@ -35,6 +35,12 @@ class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
         }
         binding.versionText.text = getString(R.string.version, Updater.CURRENT_VERSION)
         binding.checkUpdatesButton.setOnClickListener { checkForUpdates() }
+        binding.betaSwitch.setOnCheckedChangeListener { button, checked ->
+            if (!button.isPressed) return@setOnCheckedChangeListener
+            Updater.betas = checked
+            // What's on offer changes either way: a beta comes or goes.
+            Updater.check()
+        }
         // Only Android's settings can turn the watcher on or off; the switch shows what they say.
         binding.startSwitch.setOnClickListener {
             binding.startSwitch.isChecked = FollowOsmAnd.isWatcherOn(requireContext())
@@ -88,6 +94,7 @@ class LogFragment : Fragment(), AppLog.Listener, Updater.Listener {
         showFollowSettings()
         // Also answered in the home screen's dialog.
         binding.analyticsSwitch.isChecked = Analytics.isEnabled()
+        binding.betaSwitch.isChecked = Updater.betas
         AppLog.addListener(this)
         binding.logText.text = AppLog.history().asReversed().joinToString("\n")
         Updater.addListener(this)

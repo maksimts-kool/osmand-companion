@@ -219,8 +219,22 @@ git push origin v2.1.0
 
 The [Release workflow](.github/workflows/release.yml) builds the APK with the tag's version, signs it and
 publishes a GitHub release with notes generated from the merged PRs. Edit the notes on GitHub if needed: the
-app shows them in its update dialog. `versionCode` comes from the version (2.1.0 → 20100), so tags must go up
+app shows them in its update dialog. `versionCode` comes from the version (2.1.0 → 2010099), so tags must go up
 and look like `vMAJOR.MINOR.PATCH` (each part 0–99).
+
+### Betas
+
+A tag with `-beta.N` (1–98) is published as a GitHub pre-release:
+
+```bash
+git tag v2.1.0-beta.1
+git push origin v2.1.0-beta.1
+```
+
+Only apps with *Settings → Get beta versions* on are offered it; everyone else gets `v2.1.0` once it's tagged.
+A beta's `versionCode` sits between the release before it and its own (2.1.0-beta.1 → 2010001,
+2.1.0-beta.2 → 2010002, 2.1.0 → 2010099), so betas install over each other and the release over them. Someone who
+turns betas off keeps the beta until the next release is out.
 
 ### Signing key
 

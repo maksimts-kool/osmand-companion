@@ -36,6 +36,8 @@
 
     <string name="version">Версия %1$s</string>
     <string name="update_check">Проверить обновления</string>
+    <string name="update_betas">Получать бета-версии</string>
+    <string name="update_betas_hint">Также предлагает тестовые версии того, что выйдет дальше, ещё до того, как они готовы для всех. В них могут быть ошибки. Если выключить, вы получите следующую обычную версию, когда она выйдет.</string>
     <string name="update_checking">Проверка обновлений…</string>
     <string name="update_status_never">Обновления ещё не проверялись</string>
     <string name="update_status_up_to_date">Последняя версия · проверено %1$s</string>

@@ -37,6 +37,7 @@ object Updater {
     private const val KEY_LAST_CHECK = "last_check"
     private const val KEY_NOTIFIED = "notified_version"
     private const val KEY_PROMPTED = "prompted_version"
+    private const val KEY_BETAS = "betas"
     private val LAUNCH_CHECK_INTERVAL_MS = TimeUnit.MINUTES.toMillis(10)
 
     private lateinit var app: Context
@@ -70,6 +71,17 @@ object Updater {
             ?.let { runCatching { Release.fromJson(it) }.getOrNull() }
             ?.takeIf { GitHubReleases.isNewer(it.version, CURRENT_VERSION) }
 
+    /**
+     * Whether the user opted in to betas (GitHub's pre-releases) in Settings. Off again, a beta that's installed
+     * stays until the next release is out.
+     */
+    var betas: Boolean
+        get() = prefs.getBoolean(KEY_BETAS, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_BETAS, value).apply()
+            AppLog.log(if (value) "Updates: betas on" else "Updates: betas off")
+        }
+
     /** When GitHub was last asked, in epoch millis; 0 if never. */
     val lastCheck: Long get() = prefs.getLong(KEY_LAST_CHECK, 0)
 
@@ -77,7 +89,7 @@ object Updater {
     @WorkerThread
     fun checkNow(): Release? {
         val latest = try {
-            GitHubReleases.latest()
+            GitHubReleases.latest(betas)
         } catch (e: JSONException) {
             throw IOException("Unexpected answer from GitHub", e)
         }
