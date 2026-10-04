@@ -400,5 +400,9 @@ recolored in the app to fit its theme (`feature/timetable/src/main/res/raw`):
 - Nothing leaves: [Clock Time](https://lottiefiles.com/free-animation/clock-time-YX86xw76OL)
 - Live times: [Go Live](https://lottiefiles.com/free-animation/go-live-FkhFJ5HQm5) by Games Hub, with its waves on
   one side only and cropped to them
+- The "to" arrows: chevrons after [Composition 1](https://lottiefiles.com/free-animation/composition-1-yNXitCsdRt) by
+  Antoine Boudin, coming in one by one, gliding, and going one by one (`tt_anim_to.json`)
+- Choosing where to go: [Delivery](https://lottiefiles.com/free-animation/delivery-kY8epTn5lI) by Oyinloluwa Adedoyin, with
+  a bus riding the path instead of its dot and cropped to it (`feature/planner/src/main/res/raw/pl_anim_where.json`)
 
 The update popup's download animation (`app/src/main/res/raw/update_download.json`) is made for this app.

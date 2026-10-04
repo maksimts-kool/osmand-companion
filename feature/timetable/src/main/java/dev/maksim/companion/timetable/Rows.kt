@@ -86,7 +86,7 @@ object Rows {
             setCompoundDrawablesRelativeWithIntrinsicBounds(mode.icon, 0, 0, 0)
             compoundDrawablePadding = if (route.isNullOrEmpty()) 0 else resources.getDimensionPixelSize(R.dimen.tt_badge_gap)
         }
-        header.title.text = title
+        Arrows.set(header.title, title)
         header.subtitle.text = subtitle
         header.subtitle.isVisible = !subtitle.isNullOrEmpty()
         header.facts.removeAllViews()

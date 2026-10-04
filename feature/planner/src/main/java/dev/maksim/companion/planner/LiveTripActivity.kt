@@ -12,6 +12,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.addCallback
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import com.airbnb.lottie.LottieAnimationView
@@ -27,6 +29,8 @@ import dev.maksim.companion.core.padForSystemBars
 import dev.maksim.companion.planner.TripSteps.Kind
 import dev.maksim.companion.planner.databinding.PlActivityLiveBinding
 import dev.maksim.companion.planner.databinding.PlItemCountdownBinding
+import dev.maksim.companion.planner.databinding.PlItemStepBinding
+import dev.maksim.companion.timetable.Arrows
 import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.Rows
 import dev.maksim.companion.timetable.TransitFormat
@@ -69,8 +73,15 @@ class LiveTripActivity : AppCompatActivity() {
         }
     }
 
+    /** Its arrows go out first. */
+    override fun finish() {
+        if (!Arrows.leave(this) { super.finish() }) super.finish()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Back through finish(), not the system's own, so the arrows go out first.
+        onBackPressedDispatcher.addCallback(this) { finish() }
         if (TripStore.current(this) == null) return finish()
         binding = PlActivityLiveBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -231,45 +242,69 @@ class LiveTripActivity : AppCompatActivity() {
                 binding.headline.text = if (index == legs.lastIndex) trip.destination.name else walkLeg.to.name
                 binding.kicker.setText(if (osmand != null) R.string.pl_walking_osmand else R.string.pl_walking)
                 binding.kicker.isVisible = true
-                binding.away.isVisible = true
-                binding.away.text = osmand?.let { TransitFormat.relative(this, it.arrival, now) ?: TransitFormat.clock(it.arrival) }
-                    ?: ItineraryViews.distance(this, walked.metersLeft.toDouble())
-                binding.away.setTextColor(primary)
+                val soon = osmand?.let { TransitFormat.relative(this, it.arrival, now) }
+                when {
+                    osmand == null -> away(ItineraryViews.distance(this, walked.metersLeft.toDouble()), R.string.pl_cap_to_go, primary)
+                    soon != null -> away(soon, R.string.pl_cap_there_in, primary)
+                    else -> away(TransitFormat.clock(osmand.arrival), R.string.pl_cap_there_by, primary)
+                }
                 return
             }
         }
         // Got to the stop: waiting there.
         if (step.kind == Kind.BOARD && isCurrent && TripProgress.stopKey(leg.from) in trip.reached) {
-            binding.kicker.text = "${getString(R.string.pl_at_stop)} · $kicker"
+            Arrows.set(binding.kicker, "${getString(R.string.pl_at_stop)} · $kicker")
             binding.kicker.isVisible = true
-            binding.away.isVisible = true
-            binding.away.text = TransitFormat.relative(this, leg.departure, now)?.takeIf { leg.departure >= now } ?: TransitFormat.clock(leg.departure)
-            binding.away.setTextColor(if (leg.from.isLive) getColor(TtR.color.tt_live) else primary)
+            val timeColor = if (leg.from.isLive) getColor(TtR.color.tt_live) else primary
+            val soon = soon(leg.departure, now)
+            if (soon != null) away(soon, R.string.pl_cap_leaves_in, timeColor)
+            else away(TransitFormat.clock(leg.departure), R.string.pl_cap_leaves, timeColor)
             return
         }
-        // Not yet left: when to, and how long the walk is.
+        // Not yet left: when to (how long the walk is, the card under it says).
         if (step.kind == Kind.WALK && isCurrent && now < leg.departure) {
-            binding.kicker.text = "${ItineraryViews.leave(this, leg.departure, now)} · ${getString(R.string.pl_walk_to_stop).lowercase()}"
+            binding.kicker.setText(R.string.pl_walk_to_stop)
             binding.kicker.isVisible = true
-            binding.away.isVisible = true
-            binding.away.text = ItineraryViews.walk(this, leg)
-            binding.away.setTextColor(MaterialColors.getColor(binding.away, androidx.appcompat.R.attr.colorPrimary))
+            val soon = soon(leg.departure, now)
+            if (soon != null) away(soon, R.string.pl_cap_leave_in, primary)
+            else away(TransitFormat.relative(this, leg.departure, now) ?: TransitFormat.clock(leg.departure), R.string.pl_cap_leave, primary)
             return
         }
-        binding.kicker.text = kicker
+        Arrows.set(binding.kicker, kicker)
         binding.kicker.isVisible = kicker.isNotEmpty()
-        binding.away.isVisible = until != null
-        if (until != null) {
-            binding.away.text = if (isCurrent || until > now) {
-                TransitFormat.relative(this, until, now)?.takeIf { until >= now } ?: TransitFormat.clock(until)
-            } else {
-                TransitFormat.clock(until)
-            }
-            val liveTime = (step.kind == Kind.BOARD && leg.from.isLive) || (step.kind == Kind.RIDE && leg.to.isLive)
-            binding.away.setTextColor(
-                if (liveTime) getColor(TtR.color.tt_live) else MaterialColors.getColor(binding.away, androidx.appcompat.R.attr.colorPrimary),
-            )
+        if (until == null) {
+            binding.away.isVisible = false
+            binding.awayCaption.isVisible = false
+            return
         }
+        val liveTime = (step.kind == Kind.BOARD && leg.from.isLive) || (step.kind == Kind.RIDE && leg.to.isLive)
+        val timeColor = if (liveTime) getColor(TtR.color.tt_live) else primary
+        val soon = if (isCurrent || until > now) soon(until, now) else null
+        val caption = when (step.kind) {
+            Kind.BOARD -> if (soon != null) R.string.pl_cap_leaves_in else R.string.pl_cap_leaves
+            Kind.RIDE -> if (soon != null) R.string.pl_cap_get_off_in else R.string.pl_cap_get_off
+            else -> if (soon != null) R.string.pl_cap_there_in else R.string.pl_cap_there_by
+        }
+        away(soon ?: TransitFormat.clock(until), caption, timeColor)
+    }
+
+    /** The top card's number, [caption]ed with what it is. */
+    private fun away(text: String, @StringRes caption: Int, color: Int) {
+        binding.away.isVisible = true
+        binding.away.text = text
+        binding.away.setTextColor(color)
+        binding.awayCaption.isVisible = true
+        binding.awayCaption.setText(caption)
+    }
+
+    /** "13 min" to [time], if it's ahead and in the next minute or more (so it reads after "leaves in"). */
+    private fun soon(time: Long, now: Long): String? =
+        TransitFormat.relative(this, time, now)?.takeIf { time - now >= 60_000 }
+
+    /** Says what [card]'s value is. */
+    private fun caption(card: PlItemStepBinding, @StringRes caption: Int) {
+        card.caption.isVisible = true
+        card.caption.setText(caption)
     }
 
     /** A dot per step: the one looked at in the accent color, the one it's at in green. */
@@ -317,9 +352,11 @@ class LiveTripActivity : AppCompatActivity() {
                 if (osmand != null) {
                     ItineraryActivity.subtitle(card, osmandText(osmand))
                     ItineraryActivity.minutes(card, osmand.left, countdown = true)
+                    caption(card, R.string.pl_cap_to_go)
                 } else {
                     ItineraryActivity.subtitle(card, walkText(leg, trip.itinerary.end))
                     ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+                    caption(card, R.string.pl_cap_walk)
                 }
                 card.body.isVisible = true
                 walking?.takeIf { it.first == step.leg }?.let { walkProgress(card.body, it.second) }
@@ -337,9 +374,11 @@ class LiveTripActivity : AppCompatActivity() {
         if (osmand != null) {
             ItineraryActivity.subtitle(card, osmandText(osmand))
             ItineraryActivity.minutes(card, osmand.left, countdown = true)
+            caption(card, R.string.pl_cap_to_go)
         } else {
             ItineraryActivity.subtitle(card, walkText(leg, leg.arrival))
             ItineraryActivity.minutes(card, maxOf(leg.duration, 60_000L))
+            caption(card, R.string.pl_cap_walk)
         }
         card.body.isVisible = true
         walked?.let { walkProgress(card.body, it) }
@@ -349,9 +388,12 @@ class LiveTripActivity : AppCompatActivity() {
             val ride = next.ride!!
             card.body.addView(
                 TextView(this).apply {
-                    text = getString(
-                        R.string.pl_then_catch, "${ItineraryViews.vehicle(this@LiveTripActivity, ride)} → ${ride.headsign}",
-                        TransitFormat.clock(next.departure),
+                    Arrows.set(
+                        this,
+                        getString(
+                            R.string.pl_then_catch, "${ItineraryViews.vehicle(this@LiveTripActivity, ride)} → ${ride.headsign}",
+                            TransitFormat.clock(next.departure),
+                        ),
                     )
                     setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
                     if (next.from.isLive) setTextColor(getColor(TtR.color.tt_live))
@@ -370,7 +412,7 @@ class LiveTripActivity : AppCompatActivity() {
         card.badge.text = ride.route
         card.badge.backgroundTintList = ColorStateList.valueOf(mode.color)
         card.badge.setCompoundDrawablesRelativeWithIntrinsicBounds(mode.icon, 0, 0, 0)
-        card.headsign.text = "→ ${ride.headsign}"
+        Arrows.set(card.headsign, "→ ${ride.headsign}")
         val live = getColor(TtR.color.tt_live)
         val minutes = ItineraryViews.countdown(leg.departure - now)
         card.minutes.text = if (minutes < 60) minutes.toString() else TransitFormat.clock(leg.departure)
@@ -422,7 +464,13 @@ class LiveTripActivity : AppCompatActivity() {
         val count = leg.stops.size + 1
         card.title.text = resources.getQuantityString(R.plurals.pl_ride_stops, count, count, leg.to.name)
         ItineraryActivity.subtitle(card, "${ItineraryViews.vehicle(this, ride)} → ${ride.headsign}")
-        if (isCurrent) ItineraryActivity.minutes(card, leg.arrival - now, countdown = true) else ItineraryActivity.minutes(card, leg.duration)
+        if (isCurrent) {
+            ItineraryActivity.minutes(card, leg.arrival - now, countdown = true)
+            caption(card, R.string.pl_cap_to_go)
+        } else {
+            ItineraryActivity.minutes(card, leg.duration)
+            caption(card, R.string.pl_cap_ride)
+        }
         card.body.isVisible = true
         ItineraryActivity.stopRow(layoutInflater, card.body, leg.from, mode, TripLineView.Stop.FIRST, now)
         for (call in leg.stops) ItineraryActivity.stopRow(layoutInflater, card.body, call, mode, TripLineView.Stop.MIDDLE, now)

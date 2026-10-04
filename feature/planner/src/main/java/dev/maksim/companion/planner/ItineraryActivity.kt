@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.TooltipCompat
@@ -28,6 +29,7 @@ import dev.maksim.companion.planner.databinding.PlItemChangeBinding
 import dev.maksim.companion.planner.databinding.PlItemOptionBinding
 import dev.maksim.companion.planner.databinding.PlItemStepBinding
 import dev.maksim.companion.planner.databinding.PlItemSummaryBinding
+import dev.maksim.companion.timetable.Arrows
 import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.OsmAndRoute
 import dev.maksim.companion.timetable.PeatusClient
@@ -79,8 +81,15 @@ class ItineraryActivity : AppCompatActivity() {
         }
     }
 
+    /** Its arrows go out first. */
+    override fun finish() {
+        if (!Arrows.leave(this) { super.finish() }) super.finish()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Back through finish(), not the system's own, so the arrows go out first.
+        onBackPressedDispatcher.addCallback(this) { finish() }
         val way = IntentCompat.getSerializableExtra(intent, EXTRA_WAY, Way::class.java) ?: return finish()
         itinerary = way.best
         options = way.options
@@ -265,9 +274,9 @@ class ItineraryActivity : AppCompatActivity() {
         if (choices.size > 1) {
             val lines = choices.map { it.rides.first().ride!!.route }.distinct().joinToString(" / ")
             val headsigns = choices.map { it.rides.first().ride!!.headsign }.distinct().joinToString(" | ")
-            card.title.text = "${getString(mode.label)} $lines → $headsigns"
+            Arrows.set(card.title, "${getString(mode.label)} $lines → $headsigns")
         } else {
-            card.title.text = "${ItineraryViews.vehicle(this, ride)} → ${ride.headsign}"
+            Arrows.set(card.title, "${ItineraryViews.vehicle(this, ride)} → ${ride.headsign}")
         }
         subtitle(card, getString(R.string.pl_get_off, leg.to.name))
         val live = getColor(TtR.color.tt_live)
@@ -281,7 +290,6 @@ class ItineraryActivity : AppCompatActivity() {
             card.unit.isVisible = false
         }
         if (leg.from.isLive) card.number.setTextColor(live)
-        Rows.liveMark(card.live, leg.from.isLive, live)
         card.head.setOnClickListener { openTrip(leg) }
         card.body.isVisible = true
         if (choices.size > 1) options(card.body, choices, now)
@@ -363,9 +371,7 @@ class ItineraryActivity : AppCompatActivity() {
         card.title.text = destination
         card.number.text = TransitFormat.clock(itinerary.end)
         card.unit.isVisible = false
-        val live = itinerary.rides.lastOrNull()?.to?.isLive == true
-        if (live) card.number.setTextColor(getColor(TtR.color.tt_live))
-        Rows.liveMark(card.live, live, getColor(TtR.color.tt_live))
+        if (itinerary.rides.lastOrNull()?.to?.isLive == true) card.number.setTextColor(getColor(TtR.color.tt_live))
     }
 
     private fun step(parent: ViewGroup, icon: Int, color: Int): PlItemStepBinding = stepCard(layoutInflater, parent, icon, color)
@@ -504,7 +510,7 @@ class ItineraryActivity : AppCompatActivity() {
         /** [card]'s line under its title, if there's anything to say. */
         fun subtitle(card: PlItemStepBinding, text: String?) {
             card.subtitle.isVisible = !text.isNullOrEmpty()
-            card.subtitle.text = text
+            Arrows.set(card.subtitle, text)
         }
 
         /** [ms] in [card]'s value, as "13 min", or "1 h 5 min" whole; a [countdown] counts whole minutes to go. */
@@ -532,7 +538,6 @@ class ItineraryActivity : AppCompatActivity() {
             val soon = TransitFormat.relative(context, leg.departure, now)?.takeIf { leg.departure >= now - PASSED_GRACE_MS }
             row.time.text = soon ?: TransitFormat.clock(leg.departure)
             if (leg.from.isLive) row.time.setTextColor(live)
-            Rows.liveMark(row.live, leg.from.isLive, live)
             val tooSoon = option.start < now - PASSED_GRACE_MS
             row.timer.isVisible = tooSoon
             row.root.alpha = if (tooSoon && !chosen) TOO_SOON_ALPHA else 1f
@@ -575,7 +580,6 @@ class ItineraryActivity : AppCompatActivity() {
             row.etaText.text = soon
             val color = if (call?.isLive == true) live else mode.color
             if (call?.isLive == true) row.etaText.setTextColor(live)
-            Rows.liveMark(row.live, call?.isLive == true && soon != null, live)
             val delay = call?.let { ItineraryViews.delay(it) }
             row.delay.isVisible = soon != null && delay != null
             row.etaMain.setBackgroundResource(if (row.delay.isVisible) TtR.drawable.tt_pill_start_bg else TtR.drawable.tt_pill_bg)

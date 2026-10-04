@@ -160,6 +160,17 @@
     <string name="pl_eta_ahead">Будете там за %1$s до отправления: %2$s</string>
     <string name="pl_eta_miss">В таком темпе %1$s уйдёт на %2$s раньше</string>
     <string name="pl_walking">Идёте</string>
+    <string name="pl_cap_leave_in">выйти через</string>
+    <string name="pl_cap_leave">выйти</string>
+    <string name="pl_cap_leaves_in">отправится через</string>
+    <string name="pl_cap_leaves">отправится</string>
+    <string name="pl_cap_get_off_in">выход через</string>
+    <string name="pl_cap_get_off">выход</string>
+    <string name="pl_cap_there_in">на месте через</string>
+    <string name="pl_cap_there_by">на месте к</string>
+    <string name="pl_cap_to_go">осталось</string>
+    <string name="pl_cap_walk">пешком</string>
+    <string name="pl_cap_ride">в пути</string>
     <string name="pl_to_go">осталось %1$s</string>
     <string name="pl_at_stop">На остановке</string>
     <string name="pl_distance_km">%1$s км</string>

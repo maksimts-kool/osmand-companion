@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import com.google.android.material.color.MaterialColors
 import dev.maksim.companion.planner.databinding.PlItemWayBinding
+import dev.maksim.companion.timetable.Arrows
 import dev.maksim.companion.timetable.Mode
 import dev.maksim.companion.timetable.Rows
 import dev.maksim.companion.timetable.TransitFormat
@@ -30,17 +31,15 @@ object ItineraryViews {
         val minutes = minutes(best.end - best.start)
         row.duration.text = if (minutes < 60) minutes.toString() else duration(context, best.end - best.start)
         row.unit.isVisible = minutes < 60
-        row.arrive.text = "→ ${TransitFormat.clock(best.end)}"
+        Arrows.set(row.arrive, "→ ${TransitFormat.clock(best.end)}")
         row.root.contentDescription = listOf(summary(context, best), departures(context, way, now, planned)).joinToString(", ")
         if (way.isWalk) {
             chain(row.chain, best, null, walkLabel = context.getString(R.string.pl_walk_tile))
             row.departures.text = context.getString(R.string.pl_walk_distance, roundMeters(best.walkMeters))
-            Rows.liveMark(row.live, false, live)
             Rows.liveMark(row.departuresLive, false, live)
         } else {
             chain(row.chain, best, way.lines)
             val leavesLive = way.options.first().rides.first().from.isLive
-            Rows.liveMark(row.live, best.isLive, live)
             Rows.liveMark(row.departuresLive, leavesLive, live)
             row.departures.text = departures(context, way, now, planned)
             row.departures.setTextColor(if (leavesLive) live else variant)

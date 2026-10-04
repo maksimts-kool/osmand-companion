@@ -9,6 +9,7 @@ import android.view.Choreographer
 import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
@@ -56,8 +57,15 @@ class TripActivity : AppCompatActivity() {
     private var shownDelays: Map<Int, Int> = emptyMap()
     private val delays = HashMap<Int, Int>()
 
+    /** Its arrows go out first. */
+    override fun finish() {
+        if (!Arrows.leave(this) { super.finish() }) super.finish()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Back through finish(), not the system's own, so the arrows go out first.
+        onBackPressedDispatcher.addCallback(this) { finish() }
         binding = TtActivityTripBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.root.padForSystemBars()
@@ -229,7 +237,6 @@ class TripActivity : AppCompatActivity() {
                 if (tripStop.isRealtime) ColorStateList.valueOf(live).withAlpha(tint)
                 else color.withAlpha(if (i == last + 1) 0x40 else 0x1A)
             if (tripStop.isRealtime) row.etaText.setTextColor(live)
-            Rows.liveMark(row.live, tripStop.isRealtime && soon != null, live)
             showDelay(row, i, (tripStop.expected - tripStop.scheduled) / 60, soon != null, tint)
             if (passed) {
                 row.time.alpha = PAST_ALPHA

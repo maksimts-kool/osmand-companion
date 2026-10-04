@@ -153,6 +153,18 @@
     <string name="pl_eta_ahead">You\'ll be there %1$s before %2$s leaves</string>
     <string name="pl_eta_miss">At this pace you\'ll miss %1$s by %2$s</string>
     <string name="pl_walking">Walking</string>
+    <!-- What a number on the trip screen is: above it, small. -->
+    <string name="pl_cap_leave_in">leave in</string>
+    <string name="pl_cap_leave">leave</string>
+    <string name="pl_cap_leaves_in">leaves in</string>
+    <string name="pl_cap_leaves">leaves</string>
+    <string name="pl_cap_get_off_in">get off in</string>
+    <string name="pl_cap_get_off">get off</string>
+    <string name="pl_cap_there_in">there in</string>
+    <string name="pl_cap_there_by">there by</string>
+    <string name="pl_cap_to_go">to go</string>
+    <string name="pl_cap_walk">walk</string>
+    <string name="pl_cap_ride">ride</string>
     <string name="pl_to_go">%1$s to go</string>
     <string name="pl_at_stop">At the stop</string>
     <string name="pl_distance_km">%1$s km</string>

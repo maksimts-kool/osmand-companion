@@ -22,7 +22,9 @@ object States {
     fun loading(parent: ViewGroup, @ColorInt accent: Int, text: CharSequence = parent.context.getString(R.string.tt_loading)) =
         show(parent, R.raw.tt_anim_loading, text, accent)
 
-    fun empty(parent: ViewGroup, text: CharSequence) = show(parent, R.raw.tt_anim_empty, text, null)
+    /** Nothing to show, with the clock or another [animation]. */
+    fun empty(parent: ViewGroup, text: CharSequence, @RawRes animation: Int = R.raw.tt_anim_empty) =
+        show(parent, animation, text, null)
 
     /** Couldn't load; [retry] tries again. */
     fun error(parent: ViewGroup, text: CharSequence, retry: () -> Unit) =

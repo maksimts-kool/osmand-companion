@@ -312,7 +312,7 @@ class PlannerFragment : Fragment() {
             binding.progress.visibility = View.INVISIBLE
             binding.refresh.visibility = View.GONE
             binding.status.text = if (from == null && to != null) getString(R.string.pl_no_location) else null
-            States.empty(binding.results, getString(R.string.pl_needs_places))
+            States.empty(binding.results, getString(R.string.pl_needs_places), R.raw.pl_anim_where)
             return
         }
         val id = ++request
