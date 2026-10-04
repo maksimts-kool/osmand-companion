@@ -34,6 +34,9 @@ interface BackgroundFeature {
 interface CompanionHost {
     val osmand: OsmAndConnection
     val features: List<BackgroundFeature>
+
+    /** Whether one of this app's screens is started (on screen, or about to be). */
+    val hasScreenOpen: Boolean
 }
 
 val Context.companion: CompanionHost get() = applicationContext as CompanionHost

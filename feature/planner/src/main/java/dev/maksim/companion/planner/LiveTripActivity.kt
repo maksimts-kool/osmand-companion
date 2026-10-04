@@ -59,6 +59,9 @@ class LiveTripActivity : AppCompatActivity() {
 
     private val tripChanged = Runnable { if (!isDestroyed) render() }
 
+    /** The color the pulse behind the step's icon was last given. */
+    private var pulseColor: Int? = null
+
     private val background = Executors.newSingleThreadExecutor()
 
     /** Where OsmAnd has you, and its navigation to where the trip walks to now (asked about), if any. */
@@ -221,8 +224,12 @@ class LiveTripActivity : AppCompatActivity() {
         binding.stepIcon.setImageResource(icon(step, leg))
         binding.stepIcon.backgroundTintList = ColorStateList.valueOf(color)
         binding.pulse.isVisible = isCurrent && step.kind != Kind.ARRIVED
-        val filter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
-        binding.pulse.addValueCallback(KeyPath("**"), LottieProperty.COLOR_FILTER) { filter }
+        // Only when it changes: Lottie goes through the whole animation for it.
+        if (color != pulseColor) {
+            pulseColor = color
+            val filter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
+            binding.pulse.addValueCallback(KeyPath("**"), LottieProperty.COLOR_FILTER) { filter }
+        }
         val (kicker, headline, until) = when (step.kind) {
             Kind.WALK -> Triple(getString(R.string.pl_walk_to_stop), leg.to.name, leg.arrival)
             Kind.BOARD -> Triple("${ItineraryViews.vehicle(this, ride!!)} → ${ride.headsign}", leg.from.name, leg.departure)

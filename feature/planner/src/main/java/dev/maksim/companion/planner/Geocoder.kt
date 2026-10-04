@@ -3,6 +3,7 @@ package dev.maksim.companion.planner
 import dev.maksim.companion.core.Analytics
 import dev.maksim.companion.timetable.objects
 import dev.maksim.companion.timetable.optNullableString
+import dev.maksim.companion.timetable.readResponse
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -48,19 +49,14 @@ class Geocoder {
 
     private fun get(url: String, what: String): JSONObject = Analytics.timed("http.client", "GET api.peatus.ee $what") {
         val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 15_000
+        val (code, text) = readResponse(connection)
+        if (code !in 200..299) throw IOException("peatus.ee: HTTP $code")
         try {
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 15_000
-            val code = connection.responseCode
-            if (code !in 200..299) throw IOException("peatus.ee: HTTP $code")
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            try {
-                JSONObject(text)
-            } catch (e: org.json.JSONException) {
-                throw IOException("peatus.ee: unreadable answer", e)
-            }
-        } finally {
-            connection.disconnect()
+            JSONObject(text)
+        } catch (e: org.json.JSONException) {
+            throw IOException("peatus.ee: unreadable answer", e)
         }
     }
 

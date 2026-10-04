@@ -61,7 +61,11 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
     /** OsmAnd's id for each registered button row, by our row id; needed to remove them. */
     private val buttonCallbackIds = HashMap<String, Long>()
-    private val shown = HashMap<String, AMapPoint>()
+    /** What OsmAnd has of each stop in the layer, by id. */
+    private val shown = HashMap<String, Shown>()
+
+    /** What the stop's point shows ([contentOf]), apart from when it was updated, which was [at]. */
+    private class Shown(val content: List<Any?>, val at: Long)
     private var widgetText: String? = null
     private var widgetStopId: String? = null
 
@@ -136,20 +140,32 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         shown.clear()
     }
 
-    /** Makes the layer show exactly [stops]. */
+    /**
+     * Makes the layer show exactly [stops]. Only what OsmAnd doesn't have yet goes to it: the stops it lacks, those
+     * that look different now, and those whose "updated" time is getting old ([RESEND_MS]). Most of a refresh, or of
+     * the map moved a little, is the same stops as before, and each point sent has OsmAnd draw its layer again.
+     */
     fun showStops(stops: List<Stop>, now: Long) {
-        val points = stops.map { pointOf(it, details(now)) }
-        val ids = points.mapTo(HashSet()) { it.id }
+        val ids = stops.mapTo(HashSet()) { it.id }
         for (gone in shown.keys - ids) {
             osmand.call("removeMapPoint") { it.removeMapPoint(RemoveMapPointParams(LAYER_ID, gone)) }
             shown.remove(gone)
         }
+        val changed = stops.map { it to contentOf(it) }.filter { (stop, content) ->
+            val was = shown[stop.id]
+            was == null || was.content != content || now - was.at >= RESEND_MS
+        }
+        val points = changed.map { (stop, _) -> pointOf(stop, details(now)) }
         // OsmAnd merges the points it's given into the layer. Chunks keep each binder call well under its limit.
         for (chunk in points.chunked(POINTS_PER_CALL)) {
             osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(chunk))) }
         }
-        points.forEach { shown[it.id] = it }
+        changed.forEach { (stop, content) -> shown[stop.id] = Shown(content, now) }
     }
+
+    /** What [pointOf] shows of [stop], but for when it was updated. */
+    private fun contentOf(stop: Stop): List<Any?> =
+        listOf(stop.name, TransitFormat.stopType(strings, stop), stop.mode, stop.lat, stop.lon)
 
     /**
      * Puts [details] in the menu of [stop], which is open (a button in it was just pressed). OsmAnd redraws
@@ -158,7 +174,8 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     fun showInMenu(stop: Stop, details: List<String>) {
         val point = pointOf(stop, details)
         osmand.call("updateMapPoint") { it.updateMapPoint(UpdateMapPointParams(LAYER_ID, point, true)) }
-        shown[point.id] = point
+        // Its details aren't the usual ones: the next [showStops] puts them back.
+        shown[point.id] = Shown(contentOf(stop), at = 0L)
     }
 
     /**
@@ -169,7 +186,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         val point = pointOf(stop, details(now))
         // Into the layer as well, so the stop is still there once the menu is closed.
         osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(listOf(point)))) }
-        shown[point.id] = point
+        shown[point.id] = Shown(contentOf(stop), now)
         return osmand.call("showMapPoint") { it.showMapPoint(ShowMapPointParams(LAYER_ID, point)) } == true
     }
 
@@ -331,6 +348,9 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         private const val WIDGET_ORDER = 100
         private const val MAX_ZOOM = 25
         private const val POINTS_PER_CALL = 40
+
+        /** How old a stop's "updated" time in its menu gets before it's sent again, unchanged as it is. */
+        private const val RESEND_MS = 5 * 60_000L
         private const val PREF_DAY_NIGHT = "daynight_mode"
         private const val PREF_APP_THEME = "osmand_theme"
         private const val PREF_LOCALE = "preferred_locale"

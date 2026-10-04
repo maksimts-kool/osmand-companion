@@ -1,12 +1,12 @@
 package dev.maksim.companion.timetable
 
 import dev.maksim.companion.core.Analytics
+import dev.maksim.companion.core.Parallel
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.Callable
 import java.util.Locale
-import java.util.concurrent.Executors
 import kotlin.math.abs
 
 /**
@@ -71,17 +71,10 @@ class TallinnLive {
         if (stops.isEmpty()) return emptyMap()
         // Before the stops go off on their own, so they don't all fetch the city's list of them.
         runCatching { feedIds() }
-        val pool = Executors.newFixedThreadPool(minOf(PARALLEL, stops.size))
-        try {
-            val answers = pool.invokeAll(
-                stops.map { stop -> Callable { stop.id to runCatching { departures(stop) }.getOrNull() } },
-            )
-            return answers.mapNotNull { runCatching { it.get() }.getOrNull() }
-                .mapNotNull { (id, times) -> times?.let { id to it } }
-                .toMap()
-        } finally {
-            pool.shutdownNow()
-        }
+        val list = stops.toList()
+        return Parallel.map(list, PARALLEL) { departures(it) }
+            .mapIndexedNotNull { i, times -> times.getOrNull()?.let { list[i].id to it } }
+            .toMap()
     }
 
     /**
@@ -96,9 +89,16 @@ class TallinnLive {
         return stop.id.substringAfter(':').takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
     }
 
-    /** The city's list of stops as code → feed id, fetched once a day; a failed fetch is tried again later. */
+    /**
+     * The city's list of stops as code → feed id, fetched once a day; a failed fetch is tried again later. Kept in
+     * the cache ([cacheIn]) too, so a new process doesn't have to fetch it before its first stop.
+     */
     private fun feedIds(): Map<String, String> = synchronized(Companion) {
         val now = System.currentTimeMillis()
+        if (!savedRead) {
+            savedRead = true
+            readSaved()
+        }
         stopIds?.takeIf { now - stopIdsAt < STOP_LIST_MS }?.let { return it }
         if (now < stopIdsRetryAt) stopIds?.let { return it } ?: throw IOException("transport.tallinn.ee: no stop list")
         try {
@@ -111,6 +111,7 @@ class TallinnLive {
             if (ids.isEmpty()) throw IOException("transport.tallinn.ee: empty stop list")
             stopIds = ids
             stopIdsAt = now
+            save(ids, now)
             return ids
         } catch (e: IOException) {
             stopIdsRetryAt = now + STOP_LIST_RETRY_MS
@@ -119,19 +120,43 @@ class TallinnLive {
         }
     }
 
+    /** The list as [save] left it, if it did. */
+    private fun readSaved() {
+        val file = stopListFile() ?: return
+        runCatching {
+            val lines = file.readLines()
+            val at = lines.first().toLong()
+            val ids = lines.drop(1).associate { it.substringBefore(';') to it.substringAfter(';') }
+            if (ids.isNotEmpty()) {
+                stopIds = ids
+                stopIdsAt = at
+            }
+        }
+    }
+
+    private fun save(ids: Map<String, String>, at: Long) {
+        val file = stopListFile() ?: return
+        runCatching {
+            val part = File(file.path + ".part")
+            part.bufferedWriter().use { out ->
+                out.write(at.toString())
+                for ((code, id) in ids) out.append('\n').append(code).append(';').append(id)
+            }
+            part.renameTo(file)
+        }
+    }
+
+    private fun stopListFile(): File? = cacheDir?.let { File(it, STOP_LIST_FILE) }
+
     private fun get(url: String): String = Analytics.timed("http.client", "GET transport.tallinn.ee") { download(url) }
 
     private fun download(url: String): String {
         val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-            val code = connection.responseCode
-            if (code !in 200..299) throw IOException("transport.tallinn.ee: HTTP $code")
-            return connection.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            connection.disconnect()
-        }
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        val (code, text) = readResponse(connection)
+        if (code !in 200..299) throw IOException("transport.tallinn.ee: HTTP $code")
+        return text
     }
 
     /** A stop's live times, to look up the timetabled departures by. */
@@ -203,6 +228,16 @@ class TallinnLive {
     companion object {
         private const val ENDPOINT = "https://transport.tallinn.ee/siri-stop-departures.php"
         private const val STOPS = "https://transport.tallinn.ee/data/stops.txt"
+
+        /** Where [feedIds] keeps the city's list of stops; set once, when the app starts. */
+        fun cacheIn(dir: File) {
+            cacheDir = dir
+        }
+
+        @Volatile
+        private var cacheDir: File? = null
+        private var savedRead = false
+        private const val STOP_LIST_FILE = "tallinn-stops.txt"
 
         /** For [feedIds]: kept for the app's lifetime, shared by every client. */
         private var stopIds: Map<String, String>? = null

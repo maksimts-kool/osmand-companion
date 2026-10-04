@@ -53,6 +53,10 @@ class PlannerFragment : Fragment() {
     private var shown: List<Itinerary> = emptyList()
     private var plannedAt = 0L
 
+    /** The plan on screen, and what it was asked for, so a refresh can only [TripPlanner.again] it. */
+    private var lastPlan: TripPlanner.Result? = null
+    private var lastAsked: List<Any?>? = null
+
     /** Answers to an older plan are dropped. */
     private var request = 0
 
@@ -66,7 +70,7 @@ class PlannerFragment : Fragment() {
 
     private val tick = object : Runnable {
         override fun run() {
-            if (from != null && to != null) plan(quiet = true)
+            if (from != null && to != null) refresh()
             showTrip()
             mainHandler.postDelayed(this, REFRESH_MS)
         }
@@ -300,6 +304,28 @@ class PlannerFragment : Fragment() {
         picker.show(childFragmentManager, "time")
     }
 
+    /** What [plan] is asked; a plan for something else can't just be refreshed. */
+    private fun asked(): List<Any?> = listOf(from, to, time, arriveBy)
+
+    /**
+     * Keeps the ways on screen fresh: their live times now ([TripPlanner.again]), and only every [REPLAN_MS] asking the
+     * planners again (a lot more work for them, and data), for ways that weren't there before. Also when none of the
+     * ways can be taken any more.
+     */
+    private fun refresh() {
+        val last = lastPlan
+        if (last == null || lastAsked != asked() || System.currentTimeMillis() - last.plannedAt >= REPLAN_MS) return plan(quiet = true)
+        val id = ++request
+        binding.progress.visibility = View.VISIBLE
+        background.execute {
+            val result = runCatching { planner.again(last) }
+            mainHandler.post {
+                if (id != request || _binding == null) return@post
+                if (result.getOrNull()?.itineraries.isNullOrEmpty()) plan(quiet = true) else show(result, quiet = true)
+            }
+        }
+    }
+
     /** Plans from [from] to [to]; [quiet] keeps what's on screen until the new ways are in, as for a refresh. */
     private fun plan(quiet: Boolean = false) {
         if (_binding == null) return
@@ -308,6 +334,7 @@ class PlannerFragment : Fragment() {
         if (from == null || to == null) {
             request++
             shown = emptyList()
+            lastPlan = null
             binding.intro.isVisible = true
             binding.progress.visibility = View.INVISIBLE
             binding.refresh.visibility = View.GONE
@@ -327,13 +354,18 @@ class PlannerFragment : Fragment() {
         val osmand = context.companion.osmand
         val time = time
         val arriveBy = arriveBy
+        val asked = asked()
         background.execute {
             val result = runCatching {
                 // Where OsmAnd has you now, not when it was picked.
                 val origin = if (from.isMyLocation) OsmAndTrip.places(context, osmand)?.myLocation ?: from else from
                 planner.plan(TripPlanner.Request(origin, to, time, arriveBy))
             }
-            mainHandler.post { if (id == request && _binding != null) show(result, quiet) }
+            mainHandler.post {
+                if (id != request || _binding == null) return@post
+                lastAsked = asked
+                show(result, quiet)
+            }
         }
     }
 
@@ -347,6 +379,7 @@ class PlannerFragment : Fragment() {
                 return
             }
             shown = emptyList()
+            lastPlan = null
             binding.intro.isVisible = true
             binding.status.text = null
             States.error(binding.results, getString(R.string.pl_failed, message)) { plan() }
@@ -354,6 +387,7 @@ class PlannerFragment : Fragment() {
         }
         shown = planned.itineraries
         plannedAt = planned.at
+        lastPlan = planned
         val updated = TransitFormat.clock(planned.at)
         binding.status.text = if (planned.failed.isEmpty()) {
             getString(R.string.pl_updated, updated)
@@ -416,6 +450,9 @@ class PlannerFragment : Fragment() {
 
         /** Live times change about this often. */
         private const val REFRESH_MS = 30_000L
+
+        /** How often a refresh asks the planners again, rather than only putting in the live times. */
+        private const val REPLAN_MS = 3 * 60_000L
 
         /** A time picked this long before now is meant for tomorrow. */
         private const val PAST_GRACE_MS = 30 * 60 * 1000L

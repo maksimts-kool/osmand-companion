@@ -131,7 +131,8 @@ class TripFeature(private val context: Context, private val osmand: OsmAndConnec
             val (title, text) = TripNotifications.alertTexts(context, noted, alert, now)
             TripNotifications.alert(context, title, text)
         }
-        TripStore.save(context, noted)
+        // Only when something has changed: it's written to a file, and the trip's screen is drawn again.
+        if (noted != TripStore.current(context)) TripStore.save(context, noted)
         // OsmAnd's ETA, if it's walking you where the trip still walks to.
         val walk = position?.navigation?.takeIf { trip === found }
         val walking = TripPosition.walking(noted, progress, position?.here, walk)

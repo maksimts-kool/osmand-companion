@@ -1,5 +1,6 @@
 package dev.maksim.companion.planner
 
+import dev.maksim.companion.core.Parallel
 import dev.maksim.companion.timetable.Estonia
 import dev.maksim.companion.timetable.PeatusClient
 import dev.maksim.companion.timetable.RidangoLive
@@ -8,8 +9,6 @@ import dev.maksim.companion.timetable.TripStop
 import dev.maksim.companion.timetable.distanceMeters
 import java.io.IOException
 import java.util.Locale
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
 import kotlin.math.abs
 
 /**
@@ -55,12 +54,7 @@ class LiveRetimer(private val feeds: LiveFeeds, private val peatus: PeatusClient
             ride.tripId?.let { id -> ride.serviceDate?.let { id to it } }
         }.distinct()
         if (trips.size < 2) return
-        val pool = Executors.newFixedThreadPool(minOf(PARALLEL, trips.size))
-        try {
-            pool.invokeAll(trips.map { (id, date) -> Callable { feeds.county(id, date, now) } })
-        } finally {
-            pool.shutdownNow()
-        }
+        Parallel.map(trips, PARALLEL) { (id, date) -> feeds.county(id, date, now) }
     }
 
     /**

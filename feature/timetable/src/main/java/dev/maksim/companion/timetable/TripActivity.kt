@@ -46,6 +46,13 @@ class TripActivity : AppCompatActivity() {
     private var rows: List<TtItemTripStopBinding> = emptyList()
     private var renderedLast = -1
 
+    /** The stops [rows] were made for: while they're the same, [render] updates them rather than making them anew. */
+    private var rowsFor: List<String>? = null
+
+    /** The rows' own colors for the times, for those that aren't live (any more). */
+    private var timeColors: ColorStateList? = null
+    private var etaColors: ColorStateList? = null
+
     /** The vehicle, kept from one [render] to the next so it can glide ([glide]) to where it is now. */
     private var vehicle: VehicleMarker? = null
     private var vehicleX = 0f
@@ -188,45 +195,32 @@ class TripActivity : AppCompatActivity() {
         showHeader(trip, mode, times)
 
         val content = binding.content
-        content.removeAllViews()
         val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
         val (last, progress, between) = positionOf(trip, now)
         val live = getColor(R.color.tt_live)
         var fromRow: View? = null
-        val rows = ArrayList<TtItemTripStopBinding>(trip.stops.size)
+        val ids = trip.stops.map { it.stop.id }
+        if (ids != rowsFor || content.getChildAt(0)?.id == R.id.state) {
+            // Its first drawing, or another set of stops: rows for them. From then on, only what they show changes.
+            content.removeAllViews()
+            rows = trip.stops.indices.map { i -> newRow(trip, i, mode, color, fromStopId) }
+            rowsFor = ids
+            shownDelays = emptyMap()
+        }
         for ((i, tripStop) in trip.stops.withIndex()) {
             val time = times[i]
             val passed = i <= last
-            val row = TtItemTripStopBinding.inflate(layoutInflater, content, true)
-            rows += row
+            val row = rows[i]
+            if (tripStop.stop.id == fromStopId) fromRow = row.root
             row.time.text = TransitFormat.clock(time)
-            if (tripStop.isRealtime) row.time.setTextColor(live)
-            row.name.text = tripStop.stop.name
+            row.time.setTextColor(if (tripStop.isRealtime) ColorStateList.valueOf(live) else timeColors)
             with(row.line) {
-                setMode(mode)
-                kind = when (i) {
-                    0 -> TripLineView.Stop.FIRST
-                    trip.stops.lastIndex -> TripLineView.Stop.LAST
-                    else -> TripLineView.Stop.MIDDLE
-                }
                 this.passed = passed
                 passedIn = if (passed) 1f else if (between && i == last + 1) progress * 2 - 1 else 0f
                 passedOut = if (!passed) 0f else if (between && i == last) progress * 2 else 1f
+                invalidate()
             }
             // That it's live is said once, in the header; how late, at the end of each stop's ETA.
-            val yours = tripStop.stop.id == fromStopId
-            if (yours) {
-                row.root.setBackgroundResource(R.drawable.tt_row_highlight_bg)
-                row.root.backgroundTintList = color.withAlpha(0x26)
-                row.line.emphasized = true
-                row.name.setTypeface(row.name.typeface, Typeface.BOLD)
-                row.time.setTypeface(row.time.typeface, Typeface.BOLD)
-                row.status.setText(R.string.tt_your_stop)
-                row.status.setTextColor(mode.color)
-                fromRow = row.root
-            }
-            row.status.isVisible = yours
-
             // Only the stops still ahead; ahead of a late vehicle too, though their time has passed.
             val soon = TransitFormat.relative(this, time, now)?.takeIf { !passed && (time >= now || trip.liveFrom >= 0) }
             row.etaText.text = soon
@@ -236,17 +230,11 @@ class TripActivity : AppCompatActivity() {
             row.etaMain.backgroundTintList =
                 if (tripStop.isRealtime) ColorStateList.valueOf(live).withAlpha(tint)
                 else color.withAlpha(if (i == last + 1) 0x40 else 0x1A)
-            if (tripStop.isRealtime) row.etaText.setTextColor(live)
+            row.etaText.setTextColor(if (tripStop.isRealtime) ColorStateList.valueOf(live) else etaColors)
             showDelay(row, i, (tripStop.expected - tripStop.scheduled) / 60, soon != null, tint)
-            if (passed) {
-                row.time.alpha = PAST_ALPHA
-                row.name.alpha = PAST_ALPHA
-            }
-            row.root.setOnClickListener {
-                startActivity(StopActivity.intent(this@TripActivity, tripStop.stop.id, tripStop.stop.name, OpenedScreens.now()))
-            }
+            row.time.alpha = if (passed) PAST_ALPHA else 1f
+            row.name.alpha = if (passed) PAST_ALPHA else 1f
         }
-        this.rows = rows
         renderedLast = last
         shownDelays = delays.toMap()
         delays.clear()
@@ -258,6 +246,40 @@ class TripActivity : AppCompatActivity() {
         }
     }
 
+    /** Stop [i]'s row, with what doesn't change while the screen is open: its name, and whether it's yours. */
+    private fun newRow(trip: Trip, i: Int, mode: Mode, color: ColorStateList, fromStopId: String?): TtItemTripStopBinding {
+        val tripStop = trip.stops[i]
+        val row = TtItemTripStopBinding.inflate(layoutInflater, binding.content, true)
+        if (timeColors == null) {
+            timeColors = row.time.textColors
+            etaColors = row.etaText.textColors
+        }
+        row.name.text = tripStop.stop.name
+        with(row.line) {
+            setMode(mode)
+            kind = when (i) {
+                0 -> TripLineView.Stop.FIRST
+                trip.stops.lastIndex -> TripLineView.Stop.LAST
+                else -> TripLineView.Stop.MIDDLE
+            }
+        }
+        val yours = tripStop.stop.id == fromStopId
+        if (yours) {
+            row.root.setBackgroundResource(R.drawable.tt_row_highlight_bg)
+            row.root.backgroundTintList = color.withAlpha(0x26)
+            row.line.emphasized = true
+            row.name.setTypeface(row.name.typeface, Typeface.BOLD)
+            row.time.setTypeface(row.time.typeface, Typeface.BOLD)
+            row.status.setText(R.string.tt_your_stop)
+            row.status.setTextColor(mode.color)
+        }
+        row.status.isVisible = yours
+        row.root.setOnClickListener {
+            startActivity(StopActivity.intent(this@TripActivity, tripStop.stop.id, tripStop.stop.name, OpenedScreens.now()))
+        }
+        return row
+    }
+
     /**
      * The minutes [row] (stop [i]) is [delay] late, early if less than 0, as the second part of its ETA chip ([shown]
      * if it has one), like the first: "+2" in orange, "−1" in blue, on a [tint] of the same. Nothing when on time. It
@@ -267,7 +289,10 @@ class TripActivity : AppCompatActivity() {
         val pill = row.delay
         pill.isVisible = shown && delay != 0
         row.etaMain.setBackgroundResource(if (pill.isVisible) R.drawable.tt_pill_start_bg else R.drawable.tt_pill_bg)
-        if (!pill.isVisible) return
+        if (!pill.isVisible) {
+            row.eta.contentDescription = null
+            return
+        }
         delays[i] = delay
         val color = getColor(if (delay > 0) R.color.tt_late else R.color.tt_early)
         pill.text = if (delay > 0) "+$delay" else "\u2212${-delay}"
