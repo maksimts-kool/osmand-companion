@@ -1,7 +1,8 @@
 name: Release
 
 # Pushing a tag like v2.1.0 builds the signed APK and publishes it as a GitHub release.
-# Installed apps find it through the GitHub API (Updater) and offer the update.
+# Installed apps find it through the GitHub API (Updater) and offer the update. A beta's tag, like v2.1.0-beta.1,
+# is published as a pre-release, which only apps with "Get beta versions" on are offered.
 on:
   push:
     tags: ["v*"]
@@ -46,5 +47,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          PRERELEASE=""
+          case "$VERSION" in *-beta.*) PRERELEASE="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" "osmand-companion-$VERSION.apk" \
-            --title "$VERSION" --generate-notes --verify-tag
+            --title "$VERSION" --generate-notes --verify-tag $PRERELEASE

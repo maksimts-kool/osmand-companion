@@ -5,15 +5,16 @@ plugins {
 }
 
 // The version lives in gradle.properties (appVersion=major.minor.patch). The release workflow overrides it
-// with the tag: v2.1.0 builds with -PappVersion=2.1.0. versionCode follows from it, so each release installs
-// over the previous one: 2.1.0 → 20100.
+// with the tag: v2.1.0 builds with -PappVersion=2.1.0, a beta's v2.1.0-beta.1 with -PappVersion=2.1.0-beta.1.
+// versionCode follows from it, so each release installs over the previous one, and a beta sits between the release
+// before it and its own: 2.1.0-beta.1 → 2010001, 2.1.0-beta.2 → 2010002, 2.1.0 → 2010099. (Up to 2.2.4 it was
+// 20204, without the last two digits; every code since is bigger.)
 val appVersion = providers.gradleProperty("appVersion").get()
-val appVersionCode = appVersion.split('.').map { it.toIntOrNull() }.let { parts ->
-    require(parts.size == 3 && parts.all { it != null && it in 0..99 }) {
-        "appVersion must be major.minor.patch with each part 0–99, got \"$appVersion\""
-    }
-    parts[0]!! * 10000 + parts[1]!! * 100 + parts[2]!!
-}
+val appVersionCode = Regex("""(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?""").matchEntire(appVersion)
+    ?.groupValues?.drop(1)?.map { it.toIntOrNull() }
+    ?.takeIf { parts -> parts.take(3).all { it != null && it in 0..99 } && parts[3].let { it == null || it in 1..98 } }
+    ?.let { parts -> (parts[0]!! * 10000 + parts[1]!! * 100 + parts[2]!!) * 100 + (parts[3] ?: 99) }
+    ?: error("appVersion must be major.minor.patch (each part 0–99), or that with -beta.N (1–98), got \"$appVersion\"")
 
 // The release key: keystore.properties locally (not in git, see README), environment variables on CI.
 val keystoreProperties = Properties().apply {
@@ -93,4 +94,6 @@ dependencies {
     implementation("androidx.work:work-runtime:2.12.0")
     // The update popup's animation; the same version as the timetable feature's.
     implementation("com.airbnb.android:lottie:6.7.1")
+
+    testImplementation("junit:junit:4.13.2")
 }

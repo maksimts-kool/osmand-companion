@@ -123,6 +123,22 @@
                 android:text="@string/update_check" />
         </LinearLayout>
 
+        <!-- Pre-releases from GitHub too: see Updater.betas. -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/betaSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/update_betas"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/update_betas_hint"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

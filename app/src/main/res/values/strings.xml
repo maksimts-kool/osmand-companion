@@ -38,6 +38,8 @@
 
     <string name="version">Version %1$s</string>
     <string name="update_check">Check for updates</string>
+    <string name="update_betas">Get beta versions</string>
+    <string name="update_betas_hint">Also offers test versions of what\'s coming next, before it\'s ready for everyone. They may have bugs. Turned off, you get the next regular version once it\'s out.</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_status_never">Not checked for updates yet</string>
     <string name="update_status_up_to_date">Up to date · checked %1$s</string>
