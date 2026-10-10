@@ -51,6 +51,7 @@
     <string name="tt_next_departures">Next departures</string>
     <string name="tt_timetable_for">Timetable · %1$s</string>
     <string name="tt_towards">→ %1$s</string>
+    <string name="tt_trip_from">From %1$s</string>
     <string name="tt_next_in">in %1$s</string>
     <string name="tt_show_in_osmand">Show in OsmAnd</string>
     <string name="tt_osmand_missing">OsmAnd is not installed</string>

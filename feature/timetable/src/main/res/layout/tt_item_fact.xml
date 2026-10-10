@@ -1,21 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A small fact about a trip in its header card: "Mon 28 Sep", "22 stops", "38 min". Wraps to another line
-     rather than cutting its text. -->
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- A small fact about a trip in its header card: "Mon 28 Sep", its icon kept next to the text when the pill is
+     stretched. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="@drawable/tt_pill_bg"
     android:backgroundTint="?attr/colorSurface"
-    android:drawablePadding="6dp"
-    android:drawableTint="?attr/colorOnSurfaceVariant"
-    android:fontFeatureSettings="tnum"
     android:gravity="center"
-    android:includeFontPadding="false"
-    android:maxLines="1"
     android:minHeight="32dp"
+    android:orientation="horizontal"
     android:paddingHorizontal="12dp"
-    android:paddingVertical="6dp"
-    android:textAppearance="?attr/textAppearanceLabelLarge"
-    android:textColor="?attr/colorOnSurface"
-    tools:text="22 stops" />
+    android:paddingVertical="6dp">
+
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="6dp"
+        android:importantForAccessibility="no"
+        app:tint="?attr/colorOnSurfaceVariant"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:textColor="?attr/colorOnSurface"
+        tools:text="Mon 28 Sep" />
+</LinearLayout>

@@ -62,7 +62,7 @@
                     android:textStyle="bold"
                     tools:text="→ Kadriorg" />
 
-                <!-- A trip's whole route, or what a stop is. -->
+                <!-- Where a trip starts, or where a way starts from. -->
                 <TextView
                     android:id="@+id/subtitle"
                     android:layout_width="match_parent"
@@ -77,21 +77,29 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Under the buttons, full width: small facts as pills (date, number of stops, how long it takes), or a
-             stop's routes. Wraps. -->
+        <!-- Under the buttons, full width: a trip's small facts as pills (live or not, the date), sharing the
+             width. -->
+        <LinearLayout
+            android:id="@+id/pills"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:visibility="gone" />
+
+        <!-- Or a stop's routes, in even rows that each reach the right end. -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <com.google.android.material.chip.ChipGroup
+            <dev.maksim.companion.timetable.JustifiedRows
                 android:id="@+id/facts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:paddingHorizontal="12dp"
-                android:visibility="gone"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp" />
+                android:visibility="gone" />
 
             <!-- A stop's routes folded to one row end in this; see HeaderLines. -->
             <include

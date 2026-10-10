@@ -452,7 +452,8 @@ class TripActivity : AppCompatActivity() {
 
     private fun showHeader(trip: Trip, mode: Mode) {
         Rows.header(
-            binding.header, mode, trip.route, trip.headsign, trip.longName,
+            binding.header, mode, trip.route, trip.headsign,
+            trip.stops.firstOrNull()?.let { getString(R.string.tt_trip_from, it.stop.name.substringBefore(" (")) } ?: trip.longName,
             listOf(R.drawable.tt_ic_calendar to Estonia.format("EEE d MMM", trip.serviceDay * 1000 + TimeUnit.HOURS.toMillis(12))),
             live = trip.stops.any { it.isRealtime },
         )

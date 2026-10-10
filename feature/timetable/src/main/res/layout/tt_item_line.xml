@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A route serving a stop, in the stop's header: its number on the mode's color. Jumps to its timetable. -->
+<!-- A route serving a stop, in the stop's header: its number on the mode's color. Jumps to its timetable. Snug, so
+     many fit in a row; JustifiedRows widens them to fill it. -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
@@ -10,8 +11,8 @@
     android:gravity="center"
     android:includeFontPadding="false"
     android:maxLines="1"
-    android:minWidth="44dp"
-    android:paddingHorizontal="10dp"
+    android:minWidth="40dp"
+    android:paddingHorizontal="6dp"
     android:textAppearance="?attr/textAppearanceTitleMedium"
     android:textColor="@android:color/white"
     android:textStyle="bold"
