@@ -38,10 +38,17 @@ class CompanionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         handler.post(keepConnected)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        sync()
+        return START_STICKY
+    }
+
+    /** Runs exactly the features that are on, and says so in the notification. Main thread. */
+    private fun sync() {
         val enabled = host.features.filter { it.isEnabled }
         // Always go foreground first: startForegroundService() demands it even if we stop right away.
         ServiceCompat.startForeground(
@@ -57,10 +64,10 @@ class CompanionService : Service() {
             running += it
         }
         if (enabled.isEmpty()) stopSelf()
-        return START_STICKY
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         running.forEach { it.stop() }
         running.clear()
         handler.removeCallbacks(keepConnected)
@@ -97,17 +104,23 @@ class CompanionService : Service() {
         private const val NOTIFICATION_ID = 1
         private val CONNECTION_CHECK_MS = TimeUnit.SECONDS.toMillis(15)
 
+        /** The running service, if it is. */
+        @Volatile
+        private var instance: CompanionService? = null
+
         /**
          * Starts, updates or stops the service to match which features are on, and, with [FollowOsmAnd], whether
-         * OsmAnd is in use. Call it after turning one on or off. Only from the foreground (activity), a boot
-         * broadcast or [OsmAndWatcher]: Android 12+ forbids starting it from the background.
+         * OsmAnd is in use. Call it after turning one on or off, from any thread. Starting it only works from the
+         * foreground (activity), a boot broadcast or [OsmAndWatcher]: Android 12+ forbids that from the background.
+         * Updating it once it runs, or stopping it, works from anywhere.
          */
         fun update(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
-            if (FollowOsmAnd.wantsService(context)) {
-                ContextCompat.startForegroundService(context, intent)
-            } else {
-                context.stopService(intent)
+            val running = instance
+            when {
+                !FollowOsmAnd.wantsService(context) -> context.stopService(intent)
+                running != null -> running.handler.post { if (instance === running) running.sync() }
+                else -> ContextCompat.startForegroundService(context, intent)
             }
         }
     }

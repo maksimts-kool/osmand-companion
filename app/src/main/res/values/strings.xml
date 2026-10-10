@@ -11,6 +11,7 @@
     <string name="open_osmand">Open OsmAnd</string>
 
     <string name="tab_timetables">Timetables</string>
+    <string name="tab_trips">Trips</string>
     <string name="tab_log">Settings</string>
 
     <string name="log">Log</string>

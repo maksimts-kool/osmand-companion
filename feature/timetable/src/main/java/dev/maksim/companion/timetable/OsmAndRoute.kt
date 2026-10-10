@@ -33,14 +33,26 @@ import kotlin.math.min
  * The line is the operator's own, from today's feed, so it's right even where OsmAnd's own transport routes aren't
  * ([OsmRouteCheck]). OsmAnd only takes lines as tracks, so it's a track of this app's while it's shown. If this
  * app's process dies meanwhile, [clearLeftover] removes it next time.
+ *
+ * The trip planner shows a whole journey the same way ([showTracks]): a track per walk and ride, each in its own
+ * color, as OsmAnd gives a track one color.
  */
-internal object OsmAndRoute {
+object OsmAndRoute {
+
+    /** A line to draw in [color], with a marker named [Mark.name] at each of [marks], shown with OsmAnd's [icon]. */
+    class Track(val name: String, val points: List<LatLon>, val color: Int, val marks: List<Mark>, val icon: String)
+
+    class Mark(val lat: Double, val lon: Double, val name: String)
 
     private const val FILE_NAME = "OsmAnd Companion route.gpx"
     private const val LAYER_ID = "transit_route"
     private const val CARD_ID = "route"
     private const val PREFS = "osmand_route"
     private const val KEY_SHOWN = "shown"
+    private const val KEY_TRACKS = "tracks"
+
+    /** A journey's walks and rides; more is never needed. */
+    private const val MAX_TRACKS = 16
 
     /** How long OsmAnd takes to come to the front; it only moves its map once it's there. */
     private const val FIT_DELAY_MS = 1_000L
@@ -58,23 +70,68 @@ internal object OsmAndRoute {
      * OsmAnd didn't take the route (no API access, or not connected).
      */
     fun show(context: Context, osmand: OsmAndConnection, trip: Trip, shape: List<LatLon>, fromStopId: String?): Boolean {
-        if (!osmand.hasAccess) return false
-        stopWatching()
-        val color = String.format(Locale.ROOT, "#%06X", Mode.of(trip.mode).color and 0xFFFFFF)
-        val points = shape.ifEmpty { trip.stops.map { LatLon(it.stop.lat, it.stop.lon) } }
-        val gpx = gpx(context, trip, points, color)
-        // Hidden first: OsmAnd only rereads a track that's on the map when it's shown again.
-        osmand.call("hideGpx") { it.hideGpx(HideGpxParams(FILE_NAME)) }
-        val imported = osmand.call("importGpx") { it.importGpx(ImportGpxParams(gpx, FILE_NAME, color, true)) } == true
-        if (!imported) return false
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOWN, true) }
+        val mode = Mode.of(trip.mode)
+        val name = title(context, trip)
+        val track = Track(
+            name,
+            shape.ifEmpty { trip.stops.map { LatLon(it.stop.lat, it.stop.lon) } },
+            mode.color,
+            trip.stops.map { Mark(it.stop.lat, it.stop.lon, "${TransitFormat.clock(it.time(trip.serviceDay))} ${it.stop.name}") },
+            ICONS[mode] ?: DEFAULT_ICON,
+        )
+        return showTracks(context, osmand, listOf(track), card(context, trip, fromStopId))
+    }
 
-        val card = card(context, trip, fromStopId)
+    /**
+     * Blocking. Draws [tracks] in OsmAnd, each in its own color, and opens [card] (made by [card]). Like [show], the
+     * caller brings OsmAnd to the front, and it's all gone once the card is closed. False if OsmAnd didn't take it.
+     */
+    fun showTracks(context: Context, osmand: OsmAndConnection, tracks: List<Track>, card: AMapPoint): Boolean {
+        if (!osmand.hasAccess || tracks.isEmpty()) return false
+        stopWatching()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        // Those of a longer journey shown before.
+        val shown = tracks.take(MAX_TRACKS)
+        for (i in shown.size until prefs.getInt(KEY_TRACKS, 1).coerceAtMost(MAX_TRACKS)) hide(osmand, fileName(i))
+        // Noted before they're in OsmAnd, so whatever got there is cleared even if this process dies halfway.
+        prefs.edit {
+            putBoolean(KEY_SHOWN, true)
+            putInt(KEY_TRACKS, shown.size)
+        }
+        for ((i, track) in shown.withIndex()) {
+            val file = fileName(i)
+            val color = String.format(Locale.ROOT, "#%06X", track.color and 0xFFFFFF)
+            // Hidden first: OsmAnd only rereads a track that's on the map when it's shown again.
+            osmand.call("hideGpx") { it.hideGpx(HideGpxParams(file)) }
+            val imported = osmand.call("importGpx") { it.importGpx(ImportGpxParams(gpx(track, color), file, color, true)) } == true
+            if (!imported) return false
+        }
         osmand.call("removeMapLayer") { it.removeMapLayer(RemoveMapLayerParams(LAYER_ID)) }
         osmand.call("addMapLayer") { it.addMapLayer(AddMapLayerParams(layer(context, card))) }
         osmand.call("showMapPoint") { it.showMapPoint(ShowMapPointParams(LAYER_ID, card)) }
-        watch(context.applicationContext, osmand, points)
+        watch(context.applicationContext, osmand, tracks.flatMap { it.points })
         return true
+    }
+
+    /**
+     * The card for [showTracks]: like OsmAnd's own for its transport routes, with [mode]'s icon and color, [shortName]
+     * where OsmAnd puts a point's type, [title] ("Bus 10 → Vana-Pääsküla"), [subtitle] and the [details] as rows,
+     * pinned at [at].
+     */
+    fun card(
+        context: Context,
+        mode: Mode,
+        shortName: String,
+        title: String,
+        subtitle: String,
+        at: LatLon,
+        details: List<String>,
+    ): AMapPoint {
+        val params = mapOf(
+            AMapPoint.POINT_IMAGE_URI_PARAM to StopIconProvider.uri(context, mode),
+            AMapPoint.POINT_TYPE_ICON_NAME_PARAM to mode.osmandIcon,
+        )
+        return AMapPoint(CARD_ID, shortName, title, subtitle, LAYER_ID, mode.color, ALatLon(at.lat, at.lon), details, params)
     }
 
     /** Removes a route that's still in OsmAnd from before this app's process died. Blocking. */
@@ -119,17 +176,29 @@ internal object OsmAndRoute {
 
     private fun clear(context: Context, osmand: OsmAndConnection) {
         stopWatching()
-        osmand.call("hideGpx") { it.hideGpx(HideGpxParams(FILE_NAME)) }
-        // Also out of OsmAnd's list of tracks. OsmAnd only deletes tracks it knows an app imported, which it doesn't
-        // always note; hidden is what matters.
-        osmand.call("removeGpx") { it.removeGpx(RemoveGpxParams(FILE_NAME)) }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        for (i in 0 until prefs.getInt(KEY_TRACKS, 1).coerceIn(1, MAX_TRACKS)) hide(osmand, fileName(i))
         osmand.call("removeMapLayer") { it.removeMapLayer(RemoveMapLayerParams(LAYER_ID)) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_SHOWN, false) }
+        prefs.edit {
+            putBoolean(KEY_SHOWN, false)
+            putInt(KEY_TRACKS, 1)
+        }
         AppLog.log("Timetables: removed the route from OsmAnd")
     }
 
+    private fun hide(osmand: OsmAndConnection, file: String) {
+        osmand.call("hideGpx") { it.hideGpx(HideGpxParams(file)) }
+        // Also out of OsmAnd's list of tracks. OsmAnd only deletes tracks it knows an app imported, which it doesn't
+        // always note; hidden is what matters.
+        osmand.call("removeGpx") { it.removeGpx(RemoveGpxParams(file)) }
+    }
+
+    /** The first is the one a trip has always used, so one left over from an older version is cleared too. */
+    private fun fileName(i: Int) = if (i == 0) FILE_NAME else "OsmAnd Companion route ${i + 1}.gpx"
+
     /** Moves OsmAnd's map to show all of [points], keeping its menu open. */
     private fun fit(context: Context, osmand: OsmAndConnection, points: List<LatLon>) {
+        if (points.isEmpty()) return
         val south = points.minOf { it.lat }
         val north = points.maxOf { it.lat }
         val west = points.minOf { it.lon }
@@ -146,20 +215,12 @@ internal object OsmAndRoute {
      * route's long name, and every stop with its time as the detail rows.
      */
     private fun card(context: Context, trip: Trip, fromStopId: String?): AMapPoint {
-        val mode = Mode.of(trip.mode)
         val at = trip.stops.find { it.stop.id == fromStopId } ?: trip.stops.first()
         val stops = trip.stops.map { stop ->
             val line = "${TransitFormat.clock(stop.time(trip.serviceDay))}  ${stop.stop.name}"
             if (stop === at && fromStopId != null) "$line · ${context.getString(R.string.tt_your_stop)}" else line
         }
-        val params = mapOf(
-            AMapPoint.POINT_IMAGE_URI_PARAM to StopIconProvider.uri(context, mode),
-            AMapPoint.POINT_TYPE_ICON_NAME_PARAM to mode.osmandIcon,
-        )
-        return AMapPoint(
-            CARD_ID, trip.route, title(context, trip), trip.longName, LAYER_ID, mode.color,
-            ALatLon(at.stop.lat, at.stop.lon), stops, params,
-        )
+        return card(context, Mode.of(trip.mode), trip.route, title(context, trip), trip.longName, LatLon(at.stop.lat, at.stop.lon), stops)
     }
 
     private fun layer(context: Context, card: AMapPoint) =
@@ -192,22 +253,21 @@ internal object OsmAndRoute {
         return floor(min(zoomX, zoomY)).toInt().coerceIn(5, 17)
     }
 
-    private fun gpx(context: Context, trip: Trip, shape: List<LatLon>, color: String): String = buildString {
-        val name = title(context, trip)
+    private fun gpx(track: Track, color: String): String = buildString {
         append("""<?xml version="1.0" encoding="UTF-8"?>""").append('\n')
         append("""<gpx version="1.1" creator="OsmAnd Companion" xmlns="http://www.topografix.com/GPX/1/1" """)
         append("""xmlns:osmand="https://osmand.net">""").append('\n')
-        append("<metadata><name>").append(escape(name)).append("</name></metadata>\n")
-        for (stop in trip.stops) {
-            append("""<wpt lat="${stop.stop.lat}" lon="${stop.stop.lon}"><name>""")
-            append(escape("${TransitFormat.clock(stop.time(trip.serviceDay))} ${stop.stop.name}"))
-            append("</name><type>").append(escape(name)).append("</type>")
+        append("<metadata><name>").append(escape(track.name)).append("</name></metadata>\n")
+        for (mark in track.marks) {
+            append("""<wpt lat="${mark.lat}" lon="${mark.lon}"><name>""")
+            append(escape(mark.name))
+            append("</name><type>").append(escape(track.name)).append("</type>")
             append("<extensions><osmand:color>").append(color).append("</osmand:color>")
-            append("<osmand:icon>").append(ICONS[Mode.of(trip.mode)] ?: "special_marker").append("</osmand:icon>")
+            append("<osmand:icon>").append(track.icon).append("</osmand:icon>")
             append("<osmand:background>circle</osmand:background></extensions></wpt>\n")
         }
-        append("<trk><name>").append(escape(name)).append("</name><trkseg>\n")
-        for (point in shape) append("""<trkpt lat="${point.lat}" lon="${point.lon}"/>""").append('\n')
+        append("<trk><name>").append(escape(track.name)).append("</name><trkseg>\n")
+        for (point in track.points) append("""<trkpt lat="${point.lat}" lon="${point.lon}"/>""").append('\n')
         append("</trkseg></trk>\n")
         append("<extensions><osmand:color>").append(color).append("</osmand:color>")
         append("<osmand:width>bold</osmand:width><osmand:show_arrows>true</osmand:show_arrows></extensions>\n")
@@ -215,7 +275,7 @@ internal object OsmAndRoute {
     }
 
     /** OsmAnd's own icon names for waypoints. */
-    private val ICONS = mapOf(
+    val ICONS = mapOf(
         Mode.BUS to "highway_bus_stop",
         Mode.REGIONAL to "highway_bus_stop",
         Mode.TROLLEYBUS to "public_transport_stop_position_trolleybus",
@@ -223,6 +283,7 @@ internal object OsmAndRoute {
         Mode.RAIL to "railway_station",
         Mode.FERRY to "amenity_ferry_terminal",
     )
+    const val DEFAULT_ICON = "special_marker"
 
     private fun escape(text: String) = text
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")

@@ -26,6 +26,8 @@ import dev.maksim.companion.core.OsmAndConnection
 import dev.maksim.companion.core.feature
 import dev.maksim.companion.databinding.ActivityMainBinding
 import dev.maksim.companion.databinding.DialogUpdateProgressBinding
+import dev.maksim.companion.planner.PlannerFragment
+import dev.maksim.companion.timetable.OpenedScreens
 import dev.maksim.companion.timetable.OsmAndStopUi
 import dev.maksim.companion.timetable.TimetableFeature
 import dev.maksim.companion.timetable.TimetableFragment
@@ -85,7 +87,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
             })
         }
         if (savedInstanceState == null) {
-            showTab(R.id.tab_timetables)
+            if (isPlannerLink(intent)) openPlanner(intent) else showTab(R.id.tab_timetables)
             updateRequested = isUpdateLink(intent)
             Updater.checkIfStale()
             if (Analytics.shouldAsk()) askAnalytics()
@@ -98,10 +100,11 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
         CompanionService.update(this)
     }
 
-    /** OsmAnd's main menu item "Transit timetables" lands here while the app is already open. */
+    /** OsmAnd's main menu items and a stop's "Trip to here" land here while the app is already open. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (isTimetableLink(intent)) selectTab(R.id.tab_timetables)
+        if (isPlannerLink(intent)) openPlanner(intent)
         if (isUpdateLink(intent)) {
             updateRequested = true
             onUpdateChanged()
@@ -296,10 +299,24 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
 
     private fun newTab(id: Int): Fragment = when (id) {
         R.id.tab_log -> LogFragment()
+        R.id.tab_trips -> PlannerFragment()
         else -> TimetableFragment()
     }
 
     private fun isTimetableLink(intent: Intent?) = intent?.data?.toString() == OsmAndStopUi.DEEP_LINK
+
+    private fun isPlannerLink(intent: Intent?) =
+        intent?.data?.let { it.scheme + "://" + it.host } == OsmAndStopUi.PLANNER_LINK
+
+    /** The Trips tab, with where to go from the link; it came up, for the feature waiting to see if it would. */
+    private fun openPlanner(intent: Intent) {
+        val link = intent.data ?: return
+        PlannerFragment.open(link)
+        link.getQueryParameter(OsmAndStopUi.PARAM_STOP)?.let { OpenedScreens.resumed(this, OpenedScreens.Screen.PLANNER, it) }
+        selectTab(R.id.tab_trips)
+        // On screen already, it takes the link now; otherwise once it shows.
+        (supportFragmentManager.findFragmentByTag(R.id.tab_trips.toString()) as? PlannerFragment)?.linkArrived()
+    }
 
     private fun isUpdateLink(intent: Intent?) = intent?.getBooleanExtra(UpdateWorker.EXTRA_SHOW_UPDATE, false) == true
 
@@ -334,7 +351,7 @@ class MainActivity : AppCompatActivity(), OsmAndConnection.Listener, Updater.Lis
 
     private companion object {
         /** The tabs in activity_main's tab bar, in order. */
-        val TAB_IDS = listOf(R.id.tab_timetables, R.id.tab_log)
+        val TAB_IDS = listOf(R.id.tab_timetables, R.id.tab_trips, R.id.tab_log)
 
         const val OPENED_REPORT_DELAY_MS = 3000L
     }

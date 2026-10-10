@@ -42,6 +42,11 @@ class OsmAndWatcher : AccessibilityService() {
                 if (osmand.call("getAppInfo") { it.appInfo }?.isMapVisible == true) onOsmAndInFront()
             }
             update()
+            // It isn't in use, and nothing here needs it: let it go. Connected, Android would keep it running (and
+            // bring it back if closed) until it's next opened and left.
+            if (!FollowOsmAnd.isOsmAndActive && !FollowOsmAnd.wantsService(this) && !companion.hasScreenOpen) {
+                osmand.disconnect()
+            }
         }, STARTUP_CHECK_MS)
     }
 
@@ -101,7 +106,8 @@ class OsmAndWatcher : AccessibilityService() {
         val osmand = companion.osmand
         if (osmand.hasAccess && osmand.call("getAppInfo") { it.appInfo }?.isMapVisible == true) return onOsmAndInFront()
         FollowOsmAnd.isOsmAndActive = false
-        if (!FollowOsmAnd.stopWithOsmAnd(this) || !companion.features.any { it.isEnabled }) return
+        // Not stopping with OsmAnd, or something's under way without it (a trip).
+        if (!companion.features.any { it.isEnabled } || FollowOsmAnd.wantsService(this)) return
         AppLog.log("OsmAnd closed: stopping")
         update()
         // Let OsmAnd go too: while connected, Android keeps it running, and brings it back if it's closed. Only once

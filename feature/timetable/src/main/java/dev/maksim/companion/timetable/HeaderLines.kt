@@ -4,7 +4,6 @@ import android.content.res.ColorStateList
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
-import androidx.core.view.children
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
@@ -61,46 +60,32 @@ internal class HeaderLines(
         }
     }
 
-    /**
-     * Works out the rows the way the routes' flow layout lays them out, from their widths, so it doesn't have to
-     * show them all first.
-     */
+    /** Where the routes' rows put them, and where the "…" goes when they're folded to the first. */
     private fun measureRows() {
-        val lines = facts.children.toList()
         val inner = facts.width - facts.paddingLeft - facts.paddingRight
-        if (lines.isEmpty() || inner <= 0) {
+        facts.measure(
+            View.MeasureSpec.makeMeasureSpec(facts.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        val rows = facts.rows
+        if (rows.isEmpty() || inner <= 0) {
             fullHeight = 0
             rowHeight = 0
             replaced = emptyList()
             below = emptyList()
             return
         }
-        val gap = facts.chipSpacingHorizontal
-        val first = mutableListOf<Pair<View, Int>>()
-        val rest = mutableListOf<View>()
-        var x = 0
-        var row = 0
-        for (line in lines) {
-            val width = widthOf(line)
-            if (x > 0 && x + width > inner) {
-                row++
-                x = 0
-            }
-            if (row == 0) first += line to x else rest += line
-            x += width + gap
-        }
-        facts.measure(
-            View.MeasureSpec.makeMeasureSpec(facts.width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-        )
+        val first = rows.first()
         fullHeight = facts.measuredHeight
-        rowHeight = facts.paddingTop + lines.first().measuredHeight + facts.paddingBottom
-        below = rest
-        // The routes that end past where the "…" has to start.
+        rowHeight = facts.paddingTop + first.first().view.measuredHeight + facts.paddingBottom
+        below = rows.drop(1).flatten().map { it.view }
+        // The routes that end past where the "…" has to start; it takes the rest of the row, as far as a route would.
+        val gap = facts.gap
         val moreWidth = widthOf(more)
-        val kept = first.filter { (line, at) -> at + line.measuredWidth + gap + moreWidth <= inner }
-        replaced = if (rest.isEmpty()) emptyList() else first.drop(kept.size).map { it.first }
-        val end = kept.lastOrNull()?.let { (line, at) -> at + line.measuredWidth + gap } ?: 0
+        val kept = first.filter { it.x + it.width + gap + moreWidth <= inner }
+        replaced = if (below.isEmpty()) emptyList() else first.drop(kept.size).map { it.view }
+        val end = kept.lastOrNull()?.let { it.x + it.width + gap } ?: 0
+        more.layoutParams = more.layoutParams.apply { width = minOf(inner - end, maxOf(moreWidth, facts.widest)) }
         more.translationX = (facts.left + facts.paddingLeft + end).toFloat()
         more.translationY = (facts.top + facts.paddingTop).toFloat()
     }

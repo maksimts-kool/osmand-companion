@@ -32,6 +32,10 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     private val peatus = PeatusClient()
     private val ui = OsmAndStopUi(context, osmand).also { it.onButton = ::onButton }
 
+    init {
+        TallinnLive.cacheIn(context.cacheDir)
+    }
+
     override val title: String = context.getString(R.string.tt_feature_title)
 
     override var isEnabled: Boolean
@@ -56,6 +60,10 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     private var retryAt = 0L
     private var failures = 0
     private var pinnedStopId: String? = null
+    private var languageCheckedAt = 0L
+
+    /** Whether OsmAnd's map was on screen at the last [update]: while it isn't, there's less to keep up with. */
+    private var mapVisible = false
 
     private val tick = object : Runnable {
         override fun run() {
@@ -65,7 +73,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 // e.g. a parcel from a newer OsmAnd we can't read; keep going rather than crash.
                 AppLog.log("Timetables: update failed: $e")
             }
-            handler?.postDelayed(this, TICK_MS)
+            handler?.postDelayed(this, if (mapVisible) TICK_MS else HIDDEN_TICK_MS)
         }
     }
 
@@ -74,6 +82,9 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         handler?.post {
             registeredWith = null
             fetchedAt = 0L
+            // Back at once, rather than at the slower pace of a hidden map.
+            handler?.removeCallbacks(tick)
+            handler?.post(tick)
         }
     }
 
@@ -105,9 +116,14 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     }
 
     private fun update() {
+        mapVisible = false
         val api = osmand.api
         if (api == null || !osmand.hasAccess) return
-        if (registeredWith === api && ui.languageChanged()) {
+        val now = System.currentTimeMillis()
+        // Asking OsmAnd its language is a call of its own: often enough to notice a change soon.
+        val checkLanguage = registeredWith === api && now - languageCheckedAt >= LANGUAGE_CHECK_MS
+        if (checkLanguage) languageCheckedAt = now
+        if (checkLanguage && ui.languageChanged()) {
             // OsmAnd keeps the names it was given; add everything again in its new language.
             ui.unregister()
             registeredWith = null
@@ -116,6 +132,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         if (registeredWith !== api) {
             if (!ui.register()) return
             registeredWith = api
+            languageCheckedAt = now
             nearbyStops = emptyList()
             AppLog.log("Timetables: added stop layer, menu buttons and widget to OsmAnd (${ui.locales.toLanguageTags()})")
         }
@@ -123,8 +140,8 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         val info = osmand.call("getAppInfo") { it.appInfo } ?: return
         // Nobody is looking: don't spend data or peatus.ee's capacity.
         if (!info.isMapVisible) return
+        mapVisible = true
         val center = info.mapLocation ?: return
-        val now = System.currentTimeMillis()
 
         if (!Estonia.contains(center.latitude, center.longitude)) {
             if (nearbyStops.isNotEmpty()) {
@@ -193,6 +210,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
             val now = System.currentTimeMillis()
             val name = when (button) {
                 OsmAndStopUi.BUTTON_SHOW_IN_APP -> "showInApp"
+                OsmAndStopUi.BUTTON_TRIP_TO -> "tripTo"
                 else -> "nextDepartures"
             }
             Analytics.signal("Timetables.button", mapOf("button" to name))
@@ -200,6 +218,7 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
                 when (button) {
                     OsmAndStopUi.BUTTON_SHOW_IN_APP -> showInApp(stopId, pressedAt)
                     OsmAndStopUi.BUTTON_DEPARTURES -> showSheet(stopId, now, pressedAt)
+                    OsmAndStopUi.BUTTON_TRIP_TO -> showPlanner(stopId)
                 }
             } catch (e: IOException) {
                 val stop = nearbyStops.find { it.id == stopId } ?: return@post
@@ -213,6 +232,14 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
     private fun showInApp(stopId: String, pressedAt: Long) {
         val name = nearbyStops.find { it.id == stopId }?.name
         open(StopActivity.intent(context, stopId, name, pressedAt, fromOsmand = true), name, OpenedScreens.Screen.STOP, stopId)
+    }
+
+    /** Opens the trip planner here with the stop as where to go. */
+    private fun showPlanner(stopId: String) {
+        val stop = nearbyStops.find { it.id == stopId } ?: peatus.stop(stopId, 0) ?: return
+        val intent = OsmAndStopUi.plannerLink(context, stop.name, stop.lat, stop.lon, stop.id)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        open(intent, stop.name, OpenedScreens.Screen.PLANNER, stopId)
     }
 
     /**
@@ -290,6 +317,13 @@ class TimetableFeature(private val context: Context, private val osmand: OsmAndC
         val OPEN_CHECK_MS = TimeUnit.SECONDS.toMillis(3)
         val OPEN_NOTIFICATION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1)
         val TICK_MS = TimeUnit.SECONDS.toMillis(4)
+
+        /**
+         * While OsmAnd's map isn't on screen: its layer already has the stops, so this is only how soon a fresh
+         * load starts once it's back.
+         */
+        val HIDDEN_TICK_MS = TimeUnit.SECONDS.toMillis(12)
+        val LANGUAGE_CHECK_MS = TimeUnit.SECONDS.toMillis(60)
         val REFRESH_MS = TimeUnit.SECONDS.toMillis(60)
 
         /** About a phone screen at zoom 16, so stops are there before you pan to them. */

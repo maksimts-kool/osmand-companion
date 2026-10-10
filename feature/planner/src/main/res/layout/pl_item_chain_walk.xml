@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A walk in an itinerary's chain, with its minutes; or the chevron between steps, without text. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="28dp"
+    android:drawablePadding="1dp"
+    android:drawableTint="?attr/colorOnSurfaceVariant"
+    android:fontFeatureSettings="tnum"
+    android:gravity="center_vertical"
+    android:includeFontPadding="false"
+    android:textAppearance="?attr/textAppearanceLabelMedium"
+    android:textColor="?attr/colorOnSurfaceVariant"
+    tools:drawableStart="@drawable/pl_ic_walk"
+    tools:text="5" />

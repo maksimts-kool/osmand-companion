@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A ride in an itinerary's chain: the vehicle and its number, in its mode's color (tinted in code). -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="28dp"
+    android:background="@drawable/tt_badge_bg"
+    android:drawablePadding="4dp"
+    android:drawableTint="@android:color/white"
+    android:gravity="center_vertical"
+    android:includeFontPadding="false"
+    android:minWidth="40dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="8dp"
+    android:textAppearance="?attr/textAppearanceLabelLarge"
+    android:textColor="@android:color/white"
+    android:textStyle="bold"
+    tools:drawableStart="@drawable/tt_ic_bus"
+    tools:text="23" />

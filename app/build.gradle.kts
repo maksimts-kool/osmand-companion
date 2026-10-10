@@ -59,7 +59,11 @@ android {
     buildTypes {
         val release = signingConfigs.findByName("release")
         release {
-            isMinifyEnabled = false
+            // R8: a fraction of the code, so the APK is smaller and the app starts quicker. What it mustn't touch is in
+            // proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = release
         }
         debug {
@@ -89,6 +93,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":feature:timetable"))
+    implementation(project(":feature:planner"))
     // The daily update check.
     implementation("androidx.work:work-runtime:2.12.0")
     // The update popup's animation; the same version as the timetable feature's.

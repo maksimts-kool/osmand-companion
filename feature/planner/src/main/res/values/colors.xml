@@ -1,0 +1,4 @@
+<resources>
+    <!-- The GO button, as Citymapper's: a green to set off with. -->
+    <color name="pl_go">#2E9D47</color>
+</resources>

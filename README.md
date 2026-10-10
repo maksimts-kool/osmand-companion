@@ -4,6 +4,8 @@ An Android companion app for [OsmAnd](https://osmand.net):
 
 - **Transit timetables (Estonia)**: OsmAnd shows public transport stops and routes but no timetables.
   This adds them right on OsmAnd's map, from [peatus.ee](https://peatus.ee).
+- **Trip planner on live times (Estonia)**: Google Maps and peatus.ee plan on the timetable. This one plans on where
+  Tallinn's buses, trolleybuses and trams and Harjumaa's county buses actually are, and shows the way on OsmAnd's map.
 
 It keeps one connection to OsmAnd and one quiet background notification, which shows while a feature is on.
 Trip summaries to Telegram live on the `feature/trips` branch for now.
@@ -14,7 +16,7 @@ Trip summaries to Telegram live on the `feature/trips` branch for now.
    (or build it, see below), open **OsmAnd Companion**, tap *Connect*.
 2. In OsmAnd open *Menu → Plugins* and tap **OsmAnd Companion — Third-party app** so it turns orange.
    OsmAnd blocks third-party apps until you do this.
-3. Turn on the features you want in the *Timetables* tab.
+3. Turn on the features you want in the *Timetables* tab. The *Trips* tab needs nothing turned on.
 
 ## Transit timetables (Estonia)
 
@@ -27,7 +29,10 @@ Turn on **Show timetables in OsmAnd** in the *Timetables* tab. Then, in OsmAnd:
 | **Stop menu → Next departures** | Opens the next departures like a departure board, up to 12 and none more than an hour away (big minutes to go, then route, destination, time, and live delay where available: those minutes turn green, with a animated live mark) in a sheet over OsmAnd's map, in OsmAnd's colors (dark when OsmAnd's map is). Tap one for that trip. |
 | **Stop menu → Full timetable** | Opens the stop's full timetable in this app (the opposite of *Show in OsmAnd*). Back goes back to OsmAnd. |
 | **Configure screen → widgets → Next departure (peatus.ee)** | Next departure from the stop you last used a button on (or the one nearest the map center), e.g. `5 · 3 min`. Tap it for that stop's full timetable in this app. |
+| **Stop menu → Trip to here** | Plans a trip from where you are to the stop, on live times ([Trip planner](#trip-planner-estonia)). |
 | **Main menu → Transit timetables** | Opens this app's stop search. |
+| **Main menu → Plan a trip (live)** | Opens the trip planner, to OsmAnd's navigation destination if it has one. |
+| **Configure screen → widgets → Trip (live)** | While a trip is being taken: its next step, e.g. `23 · 4 min` over the stop ([trip mode](#trip-mode)). |
 | **Configure map** | The *OsmAnd Companion* item shows or hides the stops. |
 
 *Next departures* and *Full timetable* open this app's screens while OsmAnd is in front, which Android (10+) only
@@ -127,6 +132,95 @@ reached from the stop menu, the widget or the main menu. OsmAnd starts those its
   wrong one (R30 from Tallinn to Tapa says "Tallinn"). A headsign that's missing, or names where the trip starts
   rather than where it ends, is replaced by the trip's last stop.
 
+## Trip planner (Estonia)
+
+The *Trips* tab plans a trip by public transport on live times. A bus that left 10 minutes ago by the timetable but is
+running 12 minutes late is still offered, if you can walk to it in time; a connection that's gone because the first
+bus is late isn't. Planners on the timetable (Google Maps, peatus.ee, transport.tallinn.ee) can't do either.
+
+- **From**: where OsmAnd has you (its last GPS fix, asked again on every plan, so this app needs no location
+  permission), else OsmAnd's map center. **To**: OsmAnd's navigation destination if it has one, so anything found
+  with OsmAnd's own search works. Either can be searched for instead ([search](#search)), or picked from the last 8 used.
+- **When**: leave now, depart at, or arrive by.
+- **Results**: as Citymapper lists them, walking on its own, then the ways, the one that gets there first on top. Ways
+  on and off at the same stops are one row ("walk › 24 / 24A › walk · 27 min → 19:33 · in 11, 22, 33 min from
+  Lehola"), in green when the first ride's time is its vehicle's. Changes under 2 minutes, a missed connection, or a
+  ride swapped for the next of its line are pointed out. The list is planned again every 30 s while it's on screen.
+- **A way's screen**: when to leave and when you're there, then a card per step on a track: each walk, each ride from
+  where it's got on to where it's got off (the stops in between a tap away) with live times and how late, and the
+  time to change. The first ride's card has the way's other departures to choose from, those that can't be made in
+  time dimmed. A ride opens its trip. The header's map button draws it on OsmAnd's map like a trip's route (a track per
+  walk and ride, in its color, with the stops on it, and a card with the steps; gone once the card is closed). *Walk
+  there with OsmAnd* starts OsmAnd's walking navigation to the first stop. *GO* follows it ([trip mode](#trip-mode)).
+
+In OsmAnd: *Main menu → Plan a trip (live)* opens the tab, to OsmAnd's destination if there is one; a stop's
+*Trip to here* button plans from where you are to that stop.
+
+### Search
+
+Results are listed the way Moovit lists them: **cities and districts** first (Tartu, Pärnu, Lasnamäe), then
+**stops** (each with its routes and the area it's in, e.g. "Bus · 5, 18, 36 · Lasnamäe, Tallinn"), then
+**addresses and places**, each with how far it is from you. Typos are fine ("kristine", "hobujama", "kadirorg"),
+and so is typing Estonian letters as plain ones ("parnu", "ulemiste", "oismae"), words run together
+("baltijaam") or half-typed ("balti j").
+
+- **Cities and districts** (`Towns`): Estonia's cities, towns, bigger villages and city districts from
+  OpenStreetMap, bundled with the app (`res/raw/pl_towns.tsv`), so they're found on the phone at once.
+- **Stops** (`StopIndex`): every stop in Estonia that's still served, from peatus.ee (one GraphQL `stops` query,
+  about 800 kB, fetched once a week and kept in the cache), also found on the phone. A stop's sides of the street
+  and a station's bays are one result. peatus.ee's own stop search only finds names that contain exactly what's
+  typed, so it's only used until the list has been fetched.
+- **Addresses and places** (`Geocoder`): [Photon](https://github.com/komoot/photon) (komoot's open-source
+  geocoder on OpenStreetMap, which forgives typos and finds shops and sights by name) and peatus.ee's Pelias
+  (Estonia's address register, every house number) side by side, merged so each place is there once. House numbers
+  only show once a number is typed.
+- The matching (`Fuzzy`): lower case without accents, double letters as one ("Tallinn" is "talin"), up to one typo
+  in words of 4 to 6 letters and two from 7 on (one if the first letter differs), and the last word may be half-typed.
+  Same-name places are ordered by how good the match is, then how big the place (for cities) or how near (for stops).
+
+### How it works
+
+One planner finds the ways (`TripPlanner`): **peatus.ee's OpenTripPlanner** (`OtpPlanner`), the national one, for
+all of Estonia, trains and intercity buses included.
+
+Leaving now, it's also asked from 15 minutes ago, so a late bus is among what it finds. Its
+itineraries then get their live times (`LiveRetimer`): Tallinn city lines from the city's feed at the stop where a ride
+is got on and the one where it's got off (the delay carries on where the feed says nothing), county buses from
+Ridango's trip, the rest as the planner had them. Each ride is checked against the one before (or the walk to the
+first): one that can't be caught any more is swapped for the next of its line from that stop (from the city's feed,
+else peatus.ee's departures), and if there's none, the way is dropped. The ways go in one list (`Ranking`): the
+same way found twice is shown once, the more live one; a way that leaves no later and gets there no
+sooner than another (a change counted as 4 minutes) is left out. The feeds' answers are shared for 20 s (`LiveFeeds`).
+Ways on and off at the same stops are shown as one (`Way`), as Citymapper does: "24 / 24A · in 11, 22, 33 min from
+Lehola", and on the way's screen its departures are there to choose from.
+
+### Trip mode
+
+*GO* on a way's screen follows that way until you're there, with the screen off and OsmAnd closed too
+(`TripFeature`, in the background service like the timetables, but kept running without OsmAnd):
+
+- **The next step**, in a notification that counts down to it: when to leave ("Leave in 4 min · Walk 3 min to
+  Tõnismägi for Bus 67 at 15:41"), when the ride comes (with how late, live), where to get off and how many stops to
+  go, then the last walk. Its buttons: *New way* plans again from where OsmAnd has you, *Stop trip* ends it.
+- **The same in OsmAnd**: a *Trip (live)* widget ("23 · 4 min" over the stop), which OsmAnd lists under
+  *Configure screen → widgets* once a trip has started; tap it for the trip's screen. And at the top of the Trips tab.
+- **Alerts**, each once: *Leave now* (90 s before), the next ride's delay each time it changes by 2 minutes or more
+  ("Bus 67 is now 5 min late · leave at 15:39"), and *Get off at the next stop* (2 minutes before).
+- **A connection that's gone**: every 20 s the rides get their live times. If the next ride can't be caught any more
+  (the city's feed has it gone already, or the ride being taken gets in too late for it, the walk between counted), it
+  plans again (at most every 90 s): from where that ride gets off, at its time, or from where OsmAnd has you if it was
+  the first. The new way takes the old one's place, with an alert saying what to take now; if there's none, an alert
+  says so, once.
+- **The live screen** (`LiveTripActivity`), opened by *GO*, the notification, the widget or the Trips tab: Citymapper's
+  GO without its map. Time left and when you're there, how far along, and what to do now, one step at a time (walk,
+  board, ride, walk, there; `TripSteps`), with *Prev* and *Next* to look at the others. Before the first ride leaves,
+  its other departures can be switched to; on a ride, its stops and a *Get off alert* switch.
+- It ends 3 minutes after you're there, or with *Stop trip*. The trip is kept in the app's files (`TripStore`), so it
+  carries on if Android kills the app on the way, or it's updated.
+
+Nothing tells it where you are on the way: a ride whose time has come is taken as being ridden. So it can't tell you
+missed the first bus unless its feed says it left early; *New way* is for that.
+
 ## Start and stop with OsmAnd
 
 *Settings* tab → *With OsmAnd*:
@@ -142,10 +236,10 @@ reached from the stop menu, the widget or the main menu. OsmAnd starts those its
   notification stop, and Companion lets go of OsmAnd so it can close too (while bound, Android keeps it running).
   Companion's own screens over OsmAnd and keyboards don't count as leaving; before stopping it also asks OsmAnd
   whether its map is on screen, since unlocking the phone doesn't always report which app is in front, and it
-  waits while the screen is off.
+  waits while the screen is off. A trip being taken ([trip mode](#trip-mode)) keeps it all running until it ends.
 
-`FollowOsmAnd.wantsService` decides whether `CompanionService` runs: a feature is on, and, with both settings on,
-OsmAnd is in use.
+`FollowOsmAnd.wantsService` decides whether `CompanionService` runs: a trip is being taken, or a feature is on and,
+with both settings on, OsmAnd is in use.
 
 ## Updates
 
@@ -191,10 +285,19 @@ metric can count unique users). Opting out deletes that id and anything not yet 
 | `App.opened` | Home screen opens (3 s later) | `osmand` (missing / disconnected / noAccess / ready), `osmandApp`, `timetables`, `displayOverApps`, `startWithOsmAnd` |
 | `Timetables.turnedOn` / `turnedOff` | The *Show timetables in OsmAnd* switch | |
 | `Timetables.activeOnMap` | Stops loaded onto OsmAnd's map, once a day | |
-| `Timetables.button` | A stop menu button in OsmAnd | `button` (nextDepartures / showInApp, the Full timetable button) |
+| `Timetables.button` | A stop menu button in OsmAnd | `button` (nextDepartures / showInApp, the Full timetable button / tripTo) |
 | `Timetables.openBlocked` | Android didn't let a screen open over OsmAnd | `screen`, `notified` |
 | `Timetables.stopOpened` | A stop tapped in this app's list | `from` (nearMap / search) |
 | `Peatus.failed` | Loading stops failed (once per streak of failures) | `error` |
+| `Planner.planned` | A trip planned in the Trips tab (not its refreshes) | `results`, `live` (whether any way is live), `best` (which planner found the first: PEATUS) |
+| `Planner.shownInOsmAnd` | A way's *Show in OsmAnd* | |
+| `Planner.walkInOsmAnd` | A way's *Walk there with OsmAnd* | |
+| `Planner.choseDeparture` | Another departure picked on a way's screen | |
+| `Trip.started` | *GO* | `rides`, `live` |
+| `Trip.liveOpened` | The live trip screen opened | |
+| `Trip.choseDeparture` | Another departure picked on the live screen | |
+| `Trip.replanned` | Trip mode planned again | `reason` (connection / gone / asked), `found` |
+| `Trip.ended` | The trip ended | `arrived` (false: stopped) |
 
 Add more with `Analytics.signal(name, params)`, or `Analytics.daily(name)` for at most once a day per device.
 Never put anything in them that could identify someone.
@@ -262,7 +365,19 @@ feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown insid
                           StopActivity, TripActivity, TimetableFragment, StopIconProvider,
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
                           States (Lottie loading/empty/error)
+feature/planner/          TripPlanner, OtpPlanner (peatus.ee's), LiveRetimer + LiveFeeds (live times into planned ways),
+                          Ranking, Way (the same way at other times, as one), PlannerFragment (the Trips tab),
+                          the search: PlaceSearchActivity, Fuzzy, Towns, StopIndex, Geocoder (Photon + peatus.ee's),
+                          ItineraryActivity, OsmAndTrip (a way on OsmAnd's map, walking navigation, OsmAnd's places);
+                          trip mode: TripFeature, TripStore (the trip being taken), TripProgress (where it is, what's
+                          missed, which alerts), TripSteps + LiveTripActivity (the live screen), TripNotifications,
+                          TripActionReceiver
 ```
+
+The planner itself only works while its screens are open; trip mode is a `BackgroundFeature` (`TripFeature`), on
+while a trip is being taken, and the one feature that runs without OsmAnd (`runsWithoutOsmAnd`). The unit tests
+(`./gradlew :feature:planner:testDebugUnitTest`) cover decoding the city's timetables, the search, live times, the
+ranking, and trip mode's steps and alerts.
 
 A feature implements `BackgroundFeature` (`isEnabled`, `start()`, `stop()`) and is listed in `CompanionApp`.
 `CompanionService.update()` runs the service while any feature is on. The service restarts after a reboot
@@ -294,6 +409,8 @@ AGP 9.4 (built-in Kotlin), Gradle 9.8, compileSdk/targetSdk 36, minSdk 24, WorkM
 `net.osmand:android-aidl-lib:master-snapshot` from OsmAnd's Ivy repo (`builder.osmand.net`), Lottie,
 Sentry (opt-in).
 Timetable data: peatus.ee (Transpordiamet); live times in Tallinn: the City of Tallinn, via transport.tallinn.ee. Route check: OpenStreetMap contributors, via the Overpass API.
+Trip planning: Ridango's and peatus.ee's OpenTripPlanner, the City of Tallinn's timetables (transport.tallinn.ee),
+peatus.ee's search (Pelias), Photon (komoot), places from OpenStreetMap contributors. RAPTOR: Delling, Pajor and Werneck, "Round-Based Public Transit Routing" (2012).
 
 ## Credits
 
@@ -305,5 +422,9 @@ recolored in the app to fit its theme (`feature/timetable/src/main/res/raw`):
 - Nothing leaves: [Clock Time](https://lottiefiles.com/free-animation/clock-time-YX86xw76OL)
 - Live times: [Go Live](https://lottiefiles.com/free-animation/go-live-FkhFJ5HQm5) by Games Hub, with its waves on
   one side only and cropped to them
+- The "to" arrows: chevrons after [Composition 1](https://lottiefiles.com/free-animation/composition-1-yNXitCsdRt) by
+  Antoine Boudin, coming in one by one, gliding, and going one by one (`tt_anim_to.json`)
+- Choosing where to go: [Delivery](https://lottiefiles.com/free-animation/delivery-kY8epTn5lI) by Oyinloluwa Adedoyin, with
+  a bus riding the path instead of its dot and cropped to it (`feature/planner/src/main/res/raw/pl_anim_where.json`)
 
 The update popup's download animation (`app/src/main/res/raw/update_download.json`) is made for this app.

@@ -1,48 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The header of the stop and trip screens: one card, tinted with the mode's color, with back, what you're
-     looking at, and an optional action. Filled in by Rows.header. -->
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The header of the stop and trip screens, as the live trip's: back and an optional action as round buttons in the
+     top corners, and one card tinted with the mode's color with what you're looking at, level with them between
+     them, curving around them, and full width under them (HeaderCard). Filled in by Rows.header. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/card"
-    style="?attr/materialCardViewFilledStyle"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginHorizontal="12dp"
-    android:layout_marginTop="8dp"
-    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-    app:cardCornerRadius="24dp">
+    android:layout_height="wrap_content">
 
-    <LinearLayout
+    <dev.maksim.companion.timetable.HeaderCard
+        android:id="@+id/card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="8dp"
         android:orientation="vertical"
-        android:paddingVertical="12dp"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:paddingBottom="12dp">
 
+        <!-- Between the buttons, what you're looking at: the vehicle and route, the stop or where it goes, and a line
+             about it. HeaderCard keeps it clear of them. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:minHeight="56dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/back"
-                style="?attr/materialIconButtonStyle"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="@string/tt_back"
-                app:icon="@drawable/tt_ic_back"
-                app:iconTint="?attr/colorOnSurface" />
+            android:minHeight="60dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp">
 
             <TextView
                 android:id="@+id/badge"
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="14dp"
+                android:layout_marginEnd="12dp"
                 android:background="@drawable/tt_hero_badge_bg"
                 android:gravity="center"
                 android:minWidth="48dp"
@@ -58,7 +49,6 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -72,6 +62,7 @@
                     android:textStyle="bold"
                     tools:text="→ Kadriorg" />
 
+                <!-- Where a trip starts, or where a way starts from. -->
                 <TextView
                     android:id="@+id/subtitle"
                     android:layout_width="match_parent"
@@ -84,34 +75,31 @@
                     tools:text="Kopli - Kadriorg"
                     tools:visibility="visible" />
             </LinearLayout>
-
-            <!-- E.g. Show in OsmAnd on a stop; hidden where there's none. -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/action"
-                style="?attr/materialIconButtonStyle"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="4dp"
-                android:visibility="gone"
-                app:iconTint="?attr/colorOnSurface"
-                tools:icon="@drawable/tt_ic_map"
-                tools:visibility="visible" />
         </LinearLayout>
 
-        <!-- Small facts as pills (date, number of stops, how long it takes), or a stop's routes. Wraps. -->
+        <!-- Under the buttons, full width: a trip's small facts as pills (live or not, the date), sharing the
+             width. -->
+        <LinearLayout
+            android:id="@+id/pills"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:visibility="gone" />
+
+        <!-- Or a stop's routes, in even rows that each reach the right end. -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <com.google.android.material.chip.ChipGroup
+            <dev.maksim.companion.timetable.JustifiedRows
                 android:id="@+id/facts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:paddingHorizontal="12dp"
-                android:visibility="gone"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp" />
+                android:visibility="gone" />
 
             <!-- A stop's routes folded to one row end in this; see HeaderLines. -->
             <include
@@ -119,5 +107,30 @@
                 layout="@layout/tt_item_line"
                 android:visibility="gone" />
         </FrameLayout>
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+    </dev.maksim.companion.timetable.HeaderCard>
+
+    <!-- In the card's cut corners, in line with its side; HeaderCard sizes them to its first row. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/back"
+        style="?attr/materialIconButtonFilledTonalStyle"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="start|top"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:contentDescription="@string/tt_back"
+        app:icon="@drawable/tt_ic_back" />
+
+    <!-- E.g. Show in OsmAnd on a stop; hidden where there's none. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/action"
+        style="?attr/materialIconButtonFilledTonalStyle"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="end|top"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="12dp"
+        android:visibility="gone"
+        tools:icon="@drawable/tt_ic_map"
+        tools:visibility="visible" />
+</FrameLayout>

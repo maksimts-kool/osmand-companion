@@ -1,6 +1,7 @@
 package dev.maksim.companion.timetable
 
 import dev.maksim.companion.core.Analytics
+import dev.maksim.companion.core.Parallel
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -92,7 +93,7 @@ data class Trip(
     val liveFrom: Int = -1,
 )
 
-data class LatLon(val lat: Double, val lon: Double)
+data class LatLon(val lat: Double, val lon: Double) : java.io.Serializable
 
 data class TripStop(val stop: Stop, val scheduled: Int, val expected: Int, val isRealtime: Boolean) {
     fun time(serviceDay: Long): Long = (serviceDay + expected) * 1000
@@ -141,7 +142,7 @@ class PeatusClient {
             }
         """
         val data = request(query, lateVariables().put("id", id).put("n", departures + EXTRA_FOR_ARRIVALS))
-        return data.optJSONObject("stop")?.let { withLive(it, departures, nightDepartures(it, NIGHT_AHEAD_S)) }
+        return data.optJSONObject("stop")?.let { withLive(it, departures, NIGHT_AHEAD_S) }
     }
 
     /**
@@ -157,7 +158,7 @@ class PeatusClient {
         """
         val n = if (max >= ALL_DEPARTURES) ALL_DEPARTURES else max + EXTRA_FOR_ARRIVALS
         val data = request(query, lateVariables().put("id", id).put("range", seconds).put("n", n))
-        return data.optJSONObject("stop")?.let { withLive(it, max, nightDepartures(it, seconds)) }
+        return data.optJSONObject("stop")?.let { withLive(it, max, seconds) }
     }
 
     /**
@@ -205,19 +206,21 @@ class PeatusClient {
             query(${'$'}id: String!, ${'$'}date: String!) {
               stop(id: ${'$'}id) {
                 $STOP
-                stoptimesForServiceDate(date: ${'$'}date, omitNonPickups: true) {
-                  pattern { headsign route { $ROUTE longName } stops { gtfsId name } }
-                  stoptimes { scheduledDeparture serviceDay headsign trip { gtfsId } }
-                }
+                stoptimesForServiceDate(date: ${'$'}date, omitNonPickups: true) { $PATTERNS }
               }
             }
         """
         val json = request(query, JSONObject().put("id", stopId).put("date", date)).optJSONObject("stop")
             ?: return null
         val stop = stopOf(json, 0)
+        return stop to routeDays(stop, json.getJSONArray("stoptimesForServiceDate"))
+    }
+
+    /** The [patterns] of [stop]'s [timetable] (a stoptimesForServiceDate), one entry per route and direction. */
+    private fun routeDays(stop: Stop, patterns: JSONArray): List<RouteDay> {
         val byDirection = LinkedHashMap<Triple<String, String, String>, MutableList<RouteTime>>()
         val longNames = HashMap<Triple<String, String, String>, String>()
-        for (pattern in json.getJSONArray("stoptimesForServiceDate").objects()) {
+        for (pattern in patterns.objects()) {
             val info = pattern.getJSONObject("pattern")
             val route = info.getJSONObject("route")
             val shortName = route.getString("shortName")
@@ -250,22 +253,39 @@ class PeatusClient {
         val days = byDirection.map { (key, times) ->
             RouteDay(key.first, key.third, key.second, longNames.getValue(key), times.sortedBy { it.time })
         }.sortedWith(compareBy(RouteOrder) { it.route })
-        return stop to days
+        return days
     }
 
     /**
      * Today's [timetable] at [stopId], with yesterday's runs after midnight in it while it's night: the last buses
      * of the evening are timetabled on the day they started (25:04), so today's service day doesn't have them, and
-     * at 00:40 the next one would seem to be the first bus of the morning.
+     * at 00:40 the next one would seem to be the first bus of the morning. Both days in one request.
      */
     fun today(stopId: String): Pair<Stop, List<RouteDay>>? {
-        val today = timetable(stopId, Estonia.serviceDate()) ?: return null
-        if (Estonia.format("H", System.currentTimeMillis(), Locale.ROOT).toInt() >= NIGHT_ENDS_H) return today
-        val night = runCatching { timetable(stopId, Estonia.serviceDate(-1)) }.getOrNull()?.second.orEmpty()
+        val date = Estonia.serviceDate()
+        if (Estonia.format("H", System.currentTimeMillis(), Locale.ROOT).toInt() >= NIGHT_ENDS_H) return timetable(stopId, date)
+        val query = """
+            query(${'$'}id: String!, ${'$'}date: String!, ${'$'}yesterday: String!) {
+              stop(id: ${'$'}id) {
+                $STOP
+                stoptimesForServiceDate(date: ${'$'}date, omitNonPickups: true) { $PATTERNS }
+                yesterday: stoptimesForServiceDate(date: ${'$'}yesterday, omitNonPickups: true) { $PATTERNS }
+              }
+            }
+        """
+        val variables = JSONObject().put("id", stopId).put("date", date).put("yesterday", Estonia.serviceDate(-1))
+        val json = try {
+            request(query, variables).optJSONObject("stop") ?: return null
+        } catch (e: GraphQLException) {
+            // peatus.ee had something against yesterday's part: today's will do.
+            return timetable(stopId, date)
+        }
+        val stop = stopOf(json, 0)
+        val routes = routeDays(stop, json.getJSONArray("stoptimesForServiceDate"))
+        val night = runCatching { routeDays(stop, json.getJSONArray("yesterday")) }.getOrNull().orEmpty()
             .map { route -> route.copy(times = route.times.filter { it.seconds >= DAY_S }) }
             .filter { it.times.isNotEmpty() }
-        if (night.isEmpty()) return today
-        val (stop, routes) = today
+        if (night.isEmpty()) return stop to routes
         fun key(route: RouteDay) = Triple(route.route, route.headsign, route.mode)
         val tonight = night.associateBy(::key)
         val merged = routes.map { route ->
@@ -281,7 +301,7 @@ class PeatusClient {
               trip(id: ${'$'}id) {
                 gtfsId tripHeadsign route { $ROUTE longName }
                 stoptimesForDate(serviceDate: ${'$'}date) {
-                  scheduledDeparture realtimeDeparture realtime serviceDay stop { $STOP }
+                  scheduledDeparture realtimeDeparture realtime serviceDay stop { $TRIP_STOP }
                 }
               }
             }
@@ -480,18 +500,23 @@ class PeatusClient {
      * The stop in [json] with its next [max] departures, those of Tallinn's city lines and of county buses at the
      * times their vehicles give ([TallinnLive], [RidangoLive]), which peatus.ee doesn't have. It only knows the
      * timetable, so one that's running late has gone from its next departures by now: that's what the [LATE] ones
-     * are for. Without either feed, the timetable it is.
+     * are for. Without either feed, the timetable it is. Tonight's night buses due in the next [nightWithin] seconds
+     * are among them ([nightDepartures]). The night buses, the city's feed and Ridango are asked side by side.
      */
-    private fun withLive(json: JSONObject, max: Int, night: List<Departure> = emptyList()): Stop {
+    private fun withLive(json: JSONObject, max: Int, nightWithin: Int): Stop {
         val stop = stopOf(json, max)
         val routes = json.optJSONArray("routes")?.objects().orEmpty()
-        val all = (departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns") + night)
-            .distinctBy { it.serviceDay to it.tripId }
-        val city = if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) null
-        else runCatching { tallinn.departures(stop) }.getOrNull()
+        val nightJob = Parallel.submit { nightDepartures(json, nightWithin) }
+        val cityJob = if (routes.none { TallinnLive.covers(it.optString("gtfsId")) }) null
+        else Parallel.submit { runCatching { tallinn.departures(stop) }.getOrNull() }
+        val timetabled = departuresOf(json, "late") + departuresOf(json, "stoptimesWithoutPatterns")
+        // Night buses are city buses, so they're none of Ridango's.
         val county = if (routes.none { modeOf(it) == REGIONAL }) emptyMap()
-        else runCatching { ridango.departures(stop, all.filter { it.mode == REGIONAL && !it.isRealtime }) }
+        else runCatching { ridango.departures(stop, timetabled.filter { it.mode == REGIONAL && !it.isRealtime }) }
             .getOrDefault(emptyMap())
+        val night = runCatching { Parallel.await(nightJob) }.getOrDefault(emptyList())
+        val city = cityJob?.let { Parallel.await(it) }
+        val all = (timetabled + night).distinctBy { it.serviceDay to it.tripId }
         if (city == null && county.isEmpty() && night.isEmpty()) return stop
         val now = System.currentTimeMillis()
         val departures = all
@@ -555,20 +580,9 @@ class PeatusClient {
      */
     private fun nightShift(route: JSONObject) = if (isNight(route.optString("gtfsId"))) NIGHT_SHIFT_S else 0
 
-    /**
-     * The route's mode, except that buses are split further. The feed marks every trolleybus and every bus as BUS;
-     * trolleybuses are told apart by their id (Tallinn's "tallinna-lin_trol_72"), regional buses by peatus.ee's
-     * route color, which is red for city buses and something else for county and long-distance lines.
-     */
-    private fun modeOf(route: JSONObject): String {
-        val mode = route.optString("mode")
-        if (mode != "BUS") return mode
-        return when {
-            "_trol_" in route.optString("gtfsId") -> TROLLEYBUS
-            route.optNullableString("color")?.lowercase(Locale.ROOT)?.let { it !in CITY_BUS_COLORS } == true -> REGIONAL
-            else -> mode
-        }
-    }
+    /** The route's mode: see the companion's [modeOf]. */
+    private fun modeOf(route: JSONObject): String =
+        modeOf(route.optString("gtfsId"), route.optString("mode"), route.optNullableString("color"))
 
     /**
      * The feed lets you "board" at a trip's last stop, so the end of every line would show up as a departure
@@ -618,6 +632,21 @@ class PeatusClient {
         const val TROLLEYBUS = "TROLLEYBUS"
         const val REGIONAL = "REGIONAL"
 
+        /**
+         * A route's mode as this app tells them apart, from OpenTripPlanner's [mode], the route's [gtfsId] and its
+         * [color] on peatus.ee: buses are split further. The feed marks every trolleybus and every bus as BUS;
+         * trolleybuses are told apart by their id (Tallinn's "tallinna-lin_trol_72"), regional buses by peatus.ee's
+         * route color, which is red for city buses and something else for county and long-distance lines.
+         */
+        fun modeOf(gtfsId: String, mode: String, color: String?): String {
+            if (mode != "BUS") return mode
+            return when {
+                "_trol_" in gtfsId -> TROLLEYBUS
+                color?.lowercase(Locale.ROOT)?.let { it !in CITY_BUS_COLORS } == true -> REGIONAL
+                else -> mode
+            }
+        }
+
         /** Whether [live] may have live times for [trip] that peatus.ee doesn't. */
         fun mayGoLive(trip: Trip) = trip.mode == REGIONAL || TallinnLive.covers(trip.routeId)
 
@@ -635,6 +664,16 @@ class PeatusClient {
         /** What [modeOf] needs to know about a route. */
         private const val ROUTE = "gtfsId shortName mode color"
         private const val STOP = "gtfsId name code lat lon vehicleMode routes { $ROUTE }"
+
+        /**
+         * A trip's stops: only what its screens, the live feeds and OsmAnd go by. Without each stop's routes, which
+         * a long trip's answer would be mostly made of, so their [Stop.mode] is peatus.ee's own.
+         */
+        private const val TRIP_STOP = "gtfsId name code lat lon vehicleMode"
+
+        /** A [timetable]'s day at a stop: its routes' patterns, each with its departures. */
+        private const val PATTERNS = "pattern { headsign route { $ROUTE longName } stops { gtfsId name } }" +
+            " stoptimes { scheduledDeparture serviceDay headsign trip { gtfsId } }"
         private const val DEPARTURE = "scheduledDeparture realtimeDeparture realtime serviceDay headsign" +
             " trip { gtfsId tripHeadsign route { $ROUTE }" +
             " departureStoptime { scheduledDeparture stop { gtfsId name } } arrivalStoptime { stop { gtfsId name } } }"
@@ -700,7 +739,7 @@ object RouteOrder : Comparator<String> {
 }
 
 /** Google's encoded polyline format, which OpenTripPlanner uses for geometry. */
-internal object Polyline {
+object Polyline {
     fun decode(encoded: String): List<LatLon> {
         val points = ArrayList<LatLon>()
         var index = 0
@@ -723,42 +762,73 @@ internal object Polyline {
         }
         return points
     }
+
+    /** [points] in the same format, to the same 1e-5°: [decode] gives back what it decoded. */
+    fun encode(points: List<LatLon>): String = buildString {
+        var lat = 0
+        var lon = 0
+        for (point in points) {
+            val nextLat = Math.round(point.lat * 1e5).toInt()
+            val nextLon = Math.round(point.lon * 1e5).toInt()
+            value(nextLat - lat)
+            value(nextLon - lon)
+            lat = nextLat
+            lon = nextLon
+        }
+    }
+
+    private fun StringBuilder.value(delta: Int) {
+        var rest = if (delta < 0) (delta shl 1).inv() else delta shl 1
+        while (rest >= 0x20) {
+            append(((0x20 or (rest and 0x1F)) + 63).toChar())
+            rest = rest shr 5
+        }
+        append((rest + 63).toChar())
+    }
 }
 
 /**
  * Asks an OpenTripPlanner's GraphQL endpoint ([url]): peatus.ee's, or Ridango's ([RidangoLive]). [source] names it
  * in errors.
  */
-internal fun graphQL(url: String, source: String, query: String, variables: JSONObject): JSONObject {
+fun graphQL(url: String, source: String, query: String, variables: JSONObject): JSONObject {
     val body = JSONObject().put("query", query.trimIndent()).put("variables", variables).toString()
     val connection = URL(url).openConnection() as HttpURLConnection
-    try {
-        connection.requestMethod = "POST"
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 20_000
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        connection.outputStream.use { it.write(body.toByteArray()) }
+    connection.requestMethod = "POST"
+    connection.connectTimeout = 15_000
+    connection.readTimeout = 20_000
+    connection.doOutput = true
+    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+    connection.outputStream.use { it.write(body.toByteArray()) }
 
-        val code = connection.responseCode
-        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-        val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (code !in 200..299) throw IOException("$source: HTTP $code")
-        val json = try {
-            JSONObject(text)
-        } catch (e: org.json.JSONException) {
-            throw IOException("$source: unreadable answer", e)
-        }
-        json.optJSONArray("errors")?.let { errors ->
-            throw IOException("$source: " + errors.objects().joinToString { it.optString("message") })
-        }
-        return json.getJSONObject("data")
-    } finally {
-        connection.disconnect()
+    val (code, text) = readResponse(connection)
+    if (code !in 200..299) throw IOException("$source: HTTP $code")
+    val json = try {
+        JSONObject(text)
+    } catch (e: org.json.JSONException) {
+        throw IOException("$source: unreadable answer", e)
     }
+    json.optJSONArray("errors")?.let { errors ->
+        throw GraphQLException("$source: " + errors.objects().joinToString { it.optString("message") })
+    }
+    return json.getJSONObject("data")
 }
 
-internal fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+/** The endpoint answered, but with errors about the query: asking again the same way won't help. */
+class GraphQLException(message: String) : IOException(message)
 
-internal fun JSONObject.optNullableString(name: String): String? =
+/**
+ * [connection]'s status and body, the error body if it failed. Read to the end and closed, never disconnected: that
+ * hands the connection back to be reused by the next request to the same host, rather than each one setting up its
+ * own (TCP and TLS, a few round trips on mobile data).
+ */
+fun readResponse(connection: HttpURLConnection): Pair<Int, String> {
+    val code = connection.responseCode
+    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+    return code to stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+}
+
+fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+
+fun JSONObject.optNullableString(name: String): String? =
     if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }

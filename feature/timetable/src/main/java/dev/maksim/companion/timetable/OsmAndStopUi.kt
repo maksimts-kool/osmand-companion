@@ -41,11 +41,13 @@ import java.util.Locale
  *
  *  - a map layer with the stops around the map center (dots from zoom 13, vehicle pins from 15; Configure map
  *    has a switch for it). Tapping a stop shows its name, which way it goes, and when that was loaded;
- *  - two buttons in that menu: "Next departures" opens the live next departures in a sheet over the map
- *    ([DaySheetActivity]); "Full timetable" opens the stop's full timetable in this app;
+ *  - three buttons in that menu: "Next departures" opens the live next departures in a sheet over the map
+ *    ([DaySheetActivity]); "Full timetable" opens the stop's full timetable in this app; "Trip to here" opens this
+ *    app's trip planner with the stop as where to go;
  *  - a "Next departure" widget (Configure screen → widgets) for the stop you last pressed a button on, or the one
  *    nearest the map center. Tapping it opens the stop's full timetable in this app;
- *  - a "Transit timetables" item in OsmAnd's main menu that opens the stop search here.
+ *  - "Transit timetables" and "Plan a trip" items in OsmAnd's main menu, which open the stop search and the trip
+ *    planner here.
  *
  * All of it is in OsmAnd's language ([strings]), which can differ from this app's.
  *
@@ -59,7 +61,11 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
     /** OsmAnd's id for each registered button row, by our row id; needed to remove them. */
     private val buttonCallbackIds = HashMap<String, Long>()
-    private val shown = HashMap<String, AMapPoint>()
+    /** What OsmAnd has of each stop in the layer, by id. */
+    private val shown = HashMap<String, Shown>()
+
+    /** What the stop's point shows ([contentOf]), apart from when it was updated, which was [at]. */
+    private class Shown(val content: List<Any?>, val at: Long)
     private var widgetText: String? = null
     private var widgetStopId: String? = null
 
@@ -109,11 +115,12 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         }
         osmand.call("addMapWidget") { it.addMapWidget(AddMapWidgetParams(widget(NO_VALUE, null))) }
         // NEW_TASK: without it, Android 15+ won't bring this app's task to the front from OsmAnd's.
-        val item = NavDrawerItem(
-            strings.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK,
+        val items = listOf(
+            NavDrawerItem(strings.getString(R.string.tt_drawer_item), DEEP_LINK, Mode.BUS.osmandIcon, Intent.FLAG_ACTIVITY_NEW_TASK),
+            NavDrawerItem(strings.getString(R.string.tt_drawer_planner), PLANNER_LINK, PLANNER_ICON, Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         osmand.call("setNavDrawerItems") {
-            it.setNavDrawerItems(SetNavDrawerItemsParams(osmand.appPackage, listOf(item)))
+            it.setNavDrawerItems(SetNavDrawerItemsParams(osmand.appPackage, items))
         }
         return true
     }
@@ -133,20 +140,32 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         shown.clear()
     }
 
-    /** Makes the layer show exactly [stops]. */
+    /**
+     * Makes the layer show exactly [stops]. Only what OsmAnd doesn't have yet goes to it: the stops it lacks, those
+     * that look different now, and those whose "updated" time is getting old ([RESEND_MS]). Most of a refresh, or of
+     * the map moved a little, is the same stops as before, and each point sent has OsmAnd draw its layer again.
+     */
     fun showStops(stops: List<Stop>, now: Long) {
-        val points = stops.map { pointOf(it, details(now)) }
-        val ids = points.mapTo(HashSet()) { it.id }
+        val ids = stops.mapTo(HashSet()) { it.id }
         for (gone in shown.keys - ids) {
             osmand.call("removeMapPoint") { it.removeMapPoint(RemoveMapPointParams(LAYER_ID, gone)) }
             shown.remove(gone)
         }
+        val changed = stops.map { it to contentOf(it) }.filter { (stop, content) ->
+            val was = shown[stop.id]
+            was == null || was.content != content || now - was.at >= RESEND_MS
+        }
+        val points = changed.map { (stop, _) -> pointOf(stop, details(now)) }
         // OsmAnd merges the points it's given into the layer. Chunks keep each binder call well under its limit.
         for (chunk in points.chunked(POINTS_PER_CALL)) {
             osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(chunk))) }
         }
-        points.forEach { shown[it.id] = it }
+        changed.forEach { (stop, content) -> shown[stop.id] = Shown(content, now) }
     }
+
+    /** What [pointOf] shows of [stop], but for when it was updated. */
+    private fun contentOf(stop: Stop): List<Any?> =
+        listOf(stop.name, TransitFormat.stopType(strings, stop), stop.mode, stop.lat, stop.lon)
 
     /**
      * Puts [details] in the menu of [stop], which is open (a button in it was just pressed). OsmAnd redraws
@@ -155,7 +174,8 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     fun showInMenu(stop: Stop, details: List<String>) {
         val point = pointOf(stop, details)
         osmand.call("updateMapPoint") { it.updateMapPoint(UpdateMapPointParams(LAYER_ID, point, true)) }
-        shown[point.id] = point
+        // Its details aren't the usual ones: the next [showStops] puts them back.
+        shown[point.id] = Shown(contentOf(stop), at = 0L)
     }
 
     /**
@@ -166,7 +186,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         val point = pointOf(stop, details(now))
         // Into the layer as well, so the stop is still there once the menu is closed.
         osmand.call("updateMapLayer") { it.updateMapLayer(UpdateMapLayerParams(layer(listOf(point)))) }
-        shown[point.id] = point
+        shown[point.id] = Shown(contentOf(stop), now)
         return osmand.call("showMapPoint") { it.showMapPoint(ShowMapPointParams(LAYER_ID, point)) } == true
     }
 
@@ -264,6 +284,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         return listOf(
             row(BUTTON_DEPARTURES, R.string.tt_button_departures, "ic_action_update"),
             row(BUTTON_SHOW_IN_APP, R.string.tt_full_timetable, "ic_action_time"),
+            row(BUTTON_TRIP_TO, R.string.tt_button_trip_here, PLANNER_ICON),
         )
     }
 
@@ -280,6 +301,7 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
     companion object {
         const val BUTTON_DEPARTURES = 1
         const val BUTTON_SHOW_IN_APP = 3
+        const val BUTTON_TRIP_TO = 4
 
         /** The Full day button's, before Full timetable took its place: see [register]. */
         private const val RETIRED_BUTTON_FULL_DAY = 2
@@ -289,6 +311,31 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
 
         fun deepLink(context: Context): Intent =
             Intent(Intent.ACTION_VIEW, Uri.parse(DEEP_LINK)).setPackage(context.packageName)
+
+        /**
+         * Opens this app's trip planner; OsmAnd's main menu item points here. With a place's [Place] query parameters
+         * ([plannerLink]), that's where to go.
+         */
+        const val PLANNER_LINK = "osmandcompanion://planner"
+
+        /** The planner's link with [name] at [lat], [lon] as where to go, from OsmAnd's [stopId] if it's a stop. */
+        fun plannerLink(context: Context, name: String, lat: Double, lon: Double, stopId: String?): Intent {
+            val uri = Uri.parse(PLANNER_LINK).buildUpon()
+                .appendQueryParameter(PARAM_NAME, name)
+                .appendQueryParameter(PARAM_LAT, lat.toString())
+                .appendQueryParameter(PARAM_LON, lon.toString())
+                .apply { stopId?.let { appendQueryParameter(PARAM_STOP, it) } }
+                .build()
+            return Intent(Intent.ACTION_VIEW, uri).setPackage(context.packageName)
+        }
+
+        const val PARAM_NAME = "name"
+        const val PARAM_LAT = "lat"
+        const val PARAM_LON = "lon"
+        const val PARAM_STOP = "stop"
+
+        /** OsmAnd's icon for its own directions. */
+        private const val PLANNER_ICON = "ic_action_gdirections_dark"
 
         /** [context] with its strings and dates in [locales]. */
         fun localized(context: Context, locales: LocaleList): Context =
@@ -301,6 +348,9 @@ class OsmAndStopUi(private val context: Context, private val osmand: OsmAndConne
         private const val WIDGET_ORDER = 100
         private const val MAX_ZOOM = 25
         private const val POINTS_PER_CALL = 40
+
+        /** How old a stop's "updated" time in its menu gets before it's sent again, unchanged as it is. */
+        private const val RESEND_MS = 5 * 60_000L
         private const val PREF_DAY_NIGHT = "daynight_mode"
         private const val PREF_APP_THEME = "osmand_theme"
         private const val PREF_LOCALE = "preferred_locale"

@@ -1,5 +1,7 @@
 <resources>
     <dimen name="tt_badge_gap">6dp</dimen>
+    <!-- Between a trip's header pills. -->
+    <dimen name="tt_pill_gap">8dp</dimen>
     <!-- Room left above a route's timetable when the header jumps to it. -->
     <dimen name="tt_jump_margin">12dp</dimen>
 </resources>

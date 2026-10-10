@@ -5,9 +5,11 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.children
 import androidx.core.view.isVisible
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieProperty
@@ -22,7 +24,7 @@ import dev.maksim.companion.timetable.databinding.TtItemRowBinding
 import dev.maksim.companion.timetable.databinding.TtItemSectionBinding
 
 /** Small builders for the timetable screens, which are short lists laid out top to bottom. */
-internal object Rows {
+object Rows {
 
     fun section(parent: ViewGroup, text: CharSequence) {
         TtItemSectionBinding.inflate(LayoutInflater.from(parent.context), parent, true).root.text = text
@@ -54,7 +56,7 @@ internal object Rows {
 
     /**
      * Fills the shared header of the stop and trip screens. [route] goes next to the vehicle icon in the badge;
-     * [facts] are icon and text pairs shown as pills under the title. A stop shows its [lines] there instead, big
+     * [facts] are icon and text pairs shown as pills under the title, sharing its width. A stop shows its [lines] there instead, big
      * and in their own colors, as they're what you look for first; [onLine] makes them tappable, and those not in
      * [running] are dimmed. A trip says first whether its vehicle gives its times, once for all its stops: [live],
      * or with false that it doesn't (null for neither).
@@ -86,20 +88,23 @@ internal object Rows {
             setCompoundDrawablesRelativeWithIntrinsicBounds(mode.icon, 0, 0, 0)
             compoundDrawablePadding = if (route.isNullOrEmpty()) 0 else resources.getDimensionPixelSize(R.dimen.tt_badge_gap)
         }
-        header.title.text = title
+        Arrows.set(header.title, title)
         header.subtitle.text = subtitle
         header.subtitle.isVisible = !subtitle.isNullOrEmpty()
         header.facts.removeAllViews()
-        header.facts.isVisible = facts.isNotEmpty() || lines.isNotEmpty() || live != null
+        header.facts.isVisible = lines.isNotEmpty()
+        val pills = header.pills
+        pills.removeAllViews()
+        pills.isVisible = facts.isNotEmpty() || live != null
         val inflater = LayoutInflater.from(card.context)
-        if (live == true) TtItemLiveFactBinding.inflate(inflater, header.facts, true).run {
+        if (live == true) TtItemLiveFactBinding.inflate(inflater, pills, true).run {
             val green = card.context.getColor(R.color.tt_live)
             root.backgroundTintList = ColorStateList.valueOf(green).withAlpha(LIVE_FACT_ALPHA)
             text.text = card.context.getString(R.string.tt_live).replaceFirstChar { it.titlecase() }
             text.setTextColor(green)
             liveMark(this.live, true, green)
         }
-        if (live == false) TtItemOfflineFactBinding.inflate(inflater, header.facts, true).run {
+        if (live == false) TtItemOfflineFactBinding.inflate(inflater, pills, true).run {
             val grey = MaterialColors.getColor(card, com.google.android.material.R.attr.colorOnSurfaceVariant)
             root.backgroundTintList = ColorStateList.valueOf(grey).withAlpha(OFFLINE_FACT_ALPHA)
             text.text = card.context.getString(R.string.tt_offline).replaceFirstChar { it.titlecase() }
@@ -110,9 +115,16 @@ internal object Rows {
             mark.addValueCallback(KeyPath("**"), LottieProperty.COLOR_FILTER) { filter }
             strike.strike()
         }
-        for ((icon, text) in facts) TtItemFactBinding.inflate(inflater, header.facts, true).root.run {
-            this.text = text
-            setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+        for ((icon, text) in facts) TtItemFactBinding.inflate(inflater, pills, true).run {
+            this.text.text = text
+            this.icon.setImageResource(icon)
+        }
+        // Each an equal share of the row.
+        val gap = card.resources.getDimensionPixelSize(R.dimen.tt_pill_gap)
+        for ((i, pill) in pills.children.withIndex()) {
+            pill.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                if (i > 0) marginStart = gap
+            }
         }
         for (line in lines) TtItemLineBinding.inflate(inflater, header.facts, true).root.run {
             text = line.name
