@@ -140,8 +140,7 @@ bus is late isn't. Planners on the timetable (Google Maps, peatus.ee, transport.
 
 - **From**: where OsmAnd has you (its last GPS fix, asked again on every plan, so this app needs no location
   permission), else OsmAnd's map center. **To**: OsmAnd's navigation destination if it has one, so anything found
-  with OsmAnd's own search works. Either can be searched for instead (addresses, places and stops, via peatus.ee's
-  search), or picked from the last 8 used.
+  with OsmAnd's own search works. Either can be searched for instead ([search](#search)), or picked from the last 8 used.
 - **When**: leave now, depart at, or arrive by.
 - **Results**: as Citymapper lists them, walking on its own, then the ways, the one that gets there first on top. Ways
   on and off at the same stops are one row ("walk › 24 / 24A › walk · 27 min → 19:33 · in 11, 22, 33 min from
@@ -156,6 +155,28 @@ bus is late isn't. Planners on the timetable (Google Maps, peatus.ee, transport.
 
 In OsmAnd: *Main menu → Plan a trip (live)* opens the tab, to OsmAnd's destination if there is one; a stop's
 *Trip to here* button plans from where you are to that stop.
+
+### Search
+
+Results are listed the way Moovit lists them: **cities and districts** first (Tartu, Pärnu, Lasnamäe), then
+**stops** (each with its routes and the area it's in, e.g. "Bus · 5, 18, 36 · Lasnamäe, Tallinn"), then
+**addresses and places**, each with how far it is from you. Typos are fine ("kristine", "hobujama", "kadirorg"),
+and so is typing Estonian letters as plain ones ("parnu", "ulemiste", "oismae"), words run together
+("baltijaam") or half-typed ("balti j").
+
+- **Cities and districts** (`Towns`): Estonia's cities, towns, bigger villages and city districts from
+  OpenStreetMap, bundled with the app (`res/raw/pl_towns.tsv`), so they're found on the phone at once.
+- **Stops** (`StopIndex`): every stop in Estonia that's still served, from peatus.ee (one GraphQL `stops` query,
+  about 800 kB, fetched once a week and kept in the cache), also found on the phone. A stop's sides of the street
+  and a station's bays are one result. peatus.ee's own stop search only finds names that contain exactly what's
+  typed, so it's only used until the list has been fetched.
+- **Addresses and places** (`Geocoder`): [Photon](https://github.com/komoot/photon) (komoot's open-source
+  geocoder on OpenStreetMap, which forgives typos and finds shops and sights by name) and peatus.ee's Pelias
+  (Estonia's address register, every house number) side by side, merged so each place is there once. House numbers
+  only show once a number is typed.
+- The matching (`Fuzzy`): lower case without accents, double letters as one ("Tallinn" is "talin"), up to one typo
+  in words of 4 to 6 letters and two from 7 on (one if the first letter differs), and the last word may be half-typed.
+  Same-name places are ordered by how good the match is, then how big the place (for cities) or how near (for stops).
 
 ### How it works
 
@@ -345,7 +366,8 @@ feature/timetable/        TimetableFeature, OsmAndStopUi (everything shown insid
                           OsmAndRoute (a trip's route in OsmAnd, gone with its card), OsmRouteCheck (is OSM's route current?),
                           States (Lottie loading/empty/error)
 feature/planner/          TripPlanner, OtpPlanner (peatus.ee's), LiveRetimer + LiveFeeds (live times into planned ways),
-                          Ranking, Way (the same way at other times, as one), Geocoder (peatus.ee's search), PlannerFragment (the Trips tab), PlaceSearchActivity,
+                          Ranking, Way (the same way at other times, as one), PlannerFragment (the Trips tab),
+                          the search: PlaceSearchActivity, Fuzzy, Towns, StopIndex, Geocoder (Photon + peatus.ee's),
                           ItineraryActivity, OsmAndTrip (a way on OsmAnd's map, walking navigation, OsmAnd's places);
                           trip mode: TripFeature, TripStore (the trip being taken), TripProgress (where it is, what's
                           missed, which alerts), TripSteps + LiveTripActivity (the live screen), TripNotifications,
@@ -388,7 +410,7 @@ AGP 9.4 (built-in Kotlin), Gradle 9.8, compileSdk/targetSdk 36, minSdk 24, WorkM
 Sentry (opt-in).
 Timetable data: peatus.ee (Transpordiamet); live times in Tallinn: the City of Tallinn, via transport.tallinn.ee. Route check: OpenStreetMap contributors, via the Overpass API.
 Trip planning: Ridango's and peatus.ee's OpenTripPlanner, the City of Tallinn's timetables (transport.tallinn.ee),
-peatus.ee's search (Pelias). RAPTOR: Delling, Pajor and Werneck, "Round-Based Public Transit Routing" (2012).
+peatus.ee's search (Pelias), Photon (komoot), places from OpenStreetMap contributors. RAPTOR: Delling, Pajor and Werneck, "Round-Based Public Transit Routing" (2012).
 
 ## Credits
 

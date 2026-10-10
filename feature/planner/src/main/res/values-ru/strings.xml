@@ -72,12 +72,18 @@
     <string name="pl_trip_unknown">На peatus.ee нет этого рейса, поэтому его остановки не показать.</string>
     <string name="pl_replan">Найти новый маршрут</string>
 
-    <string name="pl_search_hint">Адрес, место или остановка</string>
+    <string name="pl_search_hint">Город, остановка или адрес</string>
     <string name="pl_recent">Недавние</string>
     <string name="pl_from_osmand">Из OsmAnd</string>
-    <string name="pl_places">Места</string>
+    <string name="pl_towns">Города и районы</string>
+    <string name="pl_stops">Остановки</string>
+    <string name="pl_kind_city">Город</string>
+    <string name="pl_kind_town">Город</string>
+    <string name="pl_kind_village">Посёлок</string>
+    <string name="pl_kind_district">Район</string>
+    <string name="pl_places">Адреса и места</string>
     <string name="pl_search_empty">По запросу «%1$s» ничего не найдено.</string>
-    <string name="pl_search_failed">Не удалось выполнить поиск на peatus.ee: %1$s</string>
+    <string name="pl_search_failed">Не удалось найти адреса: %1$s</string>
 
     <string name="pl_trip_stop">Остановить</string>
     <string name="pl_trip_feature">Поездка</string>

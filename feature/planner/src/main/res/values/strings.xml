@@ -68,12 +68,18 @@
     <string name="pl_trip_unknown">peatus.ee doesn\'t have this run, so its stops can\'t be shown.</string>
     <string name="pl_replan">Find a new way</string>
 
-    <string name="pl_search_hint">Address, place or stop</string>
+    <string name="pl_search_hint">City, stop or address</string>
     <string name="pl_recent">Recent</string>
     <string name="pl_from_osmand">From OsmAnd</string>
-    <string name="pl_places">Places</string>
+    <string name="pl_towns">Cities and districts</string>
+    <string name="pl_stops">Stops</string>
+    <string name="pl_kind_city">City</string>
+    <string name="pl_kind_town">Town</string>
+    <string name="pl_kind_village">Village</string>
+    <string name="pl_kind_district">District</string>
+    <string name="pl_places">Addresses and places</string>
     <string name="pl_search_empty">Nothing found for “%1$s”.</string>
-    <string name="pl_search_failed">Couldn\'t search peatus.ee: %1$s</string>
+    <string name="pl_search_failed">Couldn\'t search addresses: %1$s</string>
 
     <string name="pl_trip_stop">Stop trip</string>
     <string name="pl_trip_feature">Trip</string>
