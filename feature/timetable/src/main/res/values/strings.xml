@@ -81,8 +81,4 @@
     <string name="tt_route_check_failed">Couldn\'t check OsmAnd\'s data for this route</string>
     <string name="tt_route_no_access">Allow OsmAnd Companion in OsmAnd → Menu → Plugins first</string>
     <string name="tt_route_failed">OsmAnd didn\'t take the route</string>
-    <plurals name="tt_stops">
-        <item quantity="one">%1$d stop</item>
-        <item quantity="other">%1$d stops</item>
-    </plurals>
 </resources>

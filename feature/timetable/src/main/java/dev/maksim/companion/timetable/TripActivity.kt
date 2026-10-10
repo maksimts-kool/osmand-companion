@@ -184,7 +184,7 @@ class TripActivity : AppCompatActivity() {
         val color = ColorStateList.valueOf(mode.color)
         val now = System.currentTimeMillis()
         val times = trip.stops.map { it.time(trip.serviceDay) }
-        showHeader(trip, mode, times)
+        showHeader(trip, mode)
 
         val content = binding.content
         val fromStopId = intent.getStringExtra(EXTRA_FROM_STOP_ID)
@@ -450,19 +450,10 @@ class TripActivity : AppCompatActivity() {
         }
     }
 
-    private fun showHeader(trip: Trip, mode: Mode, times: List<Long>) {
-        val minutes = ((times.lastOrNull() ?: 0L) - (times.firstOrNull() ?: 0L)) / 60_000
+    private fun showHeader(trip: Trip, mode: Mode) {
         Rows.header(
-            binding.header, mode, trip.route, getString(R.string.tt_towards, trip.headsign), trip.longName,
-            listOf(
-                R.drawable.tt_ic_calendar to
-                    Estonia.format("EEE d MMM", trip.serviceDay * 1000 + TimeUnit.HOURS.toMillis(12)),
-                R.drawable.tt_ic_stops to
-                    resources.getQuantityString(R.plurals.tt_stops, trip.stops.size, trip.stops.size),
-                R.drawable.tt_ic_timer to
-                    if (minutes < 60) getString(R.string.tt_in_min, minutes.toInt())
-                    else getString(R.string.tt_in_h_min, (minutes / 60).toInt(), (minutes % 60).toInt()),
-            ),
+            binding.header, mode, trip.route, trip.headsign, trip.longName,
+            listOf(R.drawable.tt_ic_calendar to Estonia.format("EEE d MMM", trip.serviceDay * 1000 + TimeUnit.HOURS.toMillis(12))),
             live = trip.stops.any { it.isRealtime },
         )
     }

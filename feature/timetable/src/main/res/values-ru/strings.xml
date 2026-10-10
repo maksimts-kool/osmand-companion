@@ -81,10 +81,4 @@
     <string name="tt_route_check_failed">Не удалось проверить данные OsmAnd об этом маршруте</string>
     <string name="tt_route_no_access">Сначала разрешите OsmAnd Companion в OsmAnd → Меню → Плагины</string>
     <string name="tt_route_failed">OsmAnd не принял маршрут</string>
-    <plurals name="tt_stops">
-        <item quantity="one">%1$d остановка</item>
-        <item quantity="few">%1$d остановки</item>
-        <item quantity="many">%1$d остановок</item>
-        <item quantity="other">%1$d остановки</item>
-    </plurals>
 </resources>

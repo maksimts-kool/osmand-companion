@@ -261,11 +261,10 @@ class StopActivity : AppCompatActivity() {
         builtFor = routes
         this.stop = stop
         val mode = Mode.of(stop.mode)
-        // The routes come first and big; the stop's code, which only matters on the sign, goes small below the name.
-        val about = listOfNotNull(getString(R.string.tt_stop_type, getString(mode.label)), stop.code).joinToString(" · ")
+        // The routes come first and big, under the name.
         val lines = stop.lines.ifEmpty { routes.map { Line(it.route, it.mode) }.distinctBy { it.name } }
         Rows.header(
-            binding.header, mode, null, stop.name, about,
+            binding.header, mode, null, stop.name, null,
             lines = lines, running = routes.mapTo(HashSet()) { it.route }, onLine = { cards[it.name]?.invoke() },
         )
         headerLines.refresh()
