@@ -13,7 +13,6 @@ import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import com.google.android.material.chip.Chip
@@ -102,15 +101,8 @@ class StopActivity : AppCompatActivity() {
      */
     private class Next(val tripId: String, val serviceDay: Long, val scheduled: Long, val time: Long, val isRealtime: Boolean)
 
-    /** Its arrows go out first. */
-    override fun finish() {
-        if (!Arrows.leave(this) { super.finish() }) super.finish()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Back through finish(), not the system's own, so the arrows go out first.
-        onBackPressedDispatcher.addCallback(this) { finish() }
         binding = TtActivityStopBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.root.padForSystemBars()

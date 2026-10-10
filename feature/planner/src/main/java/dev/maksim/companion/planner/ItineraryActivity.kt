@@ -12,7 +12,6 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.TooltipCompat
@@ -81,15 +80,8 @@ class ItineraryActivity : AppCompatActivity() {
         }
     }
 
-    /** Its arrows go out first. */
-    override fun finish() {
-        if (!Arrows.leave(this) { super.finish() }) super.finish()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Back through finish(), not the system's own, so the arrows go out first.
-        onBackPressedDispatcher.addCallback(this) { finish() }
         val way = IntentCompat.getSerializableExtra(intent, EXTRA_WAY, Way::class.java) ?: return finish()
         itinerary = way.best
         options = way.options
