@@ -51,7 +51,7 @@
     <string name="tt_next_departures">Ближайшие отправления</string>
     <string name="tt_timetable_for">Расписание · %1$s</string>
     <string name="tt_towards">→ %1$s</string>
-    <string name="tt_trip_from">От остановки %1$s</string>
+    <string name="tt_trip_from">От %1$s</string>
     <string name="tt_next_in">через %1$s</string>
     <string name="tt_show_in_osmand">Показать в OsmAnd</string>
     <string name="tt_osmand_missing">OsmAnd не установлен</string>
